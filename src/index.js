@@ -204,7 +204,7 @@ async function sendHelp(message) {
 
 • \`addplayer   \` — Add player to pool (\`addplayer <name> <price>\`)
 
-• \`creatematch \` — Open match (\`creatematch <PlayerA> vs <PlayerB>\`)
+• \`creatematch \` — Open match (\`creatematch <PlayerA> vs <PlayerB> [OddsA] [OddsB]\`)
 
 • \`endmatch    \` — Close & payout (\`endmatch <id> <Winner>\`)
 

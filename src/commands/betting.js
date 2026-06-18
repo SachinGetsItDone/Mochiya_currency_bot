@@ -18,19 +18,34 @@ const bettingCommands = {
 
     // Look for " vs " or " VS " separator in args to support multi-word player names
     const vsIndex = args.findIndex((a) => a.toLowerCase() === 'vs');
-    let playerA, playerB;
+    let playerA, playerB, oddsA = null, oddsB = null;
 
     if (vsIndex !== -1) {
       playerA = args.slice(0, vsIndex).join(' ');
-      playerB = args.slice(vsIndex + 1).join(' ');
+      const rest = args.slice(vsIndex + 1);
+      
+      // Check if last two args are numbers (odds)
+      if (rest.length >= 3 && !isNaN(parseFloat(rest[rest.length - 2])) && !isNaN(parseFloat(rest[rest.length - 1]))) {
+        oddsB = parseFloat(rest.pop());
+        oddsA = parseFloat(rest.pop());
+      }
+      playerB = rest.join(' ');
     } else {
       // Fallback: PlayerB is last word, PlayerA is rest
-      playerB = args[args.length - 1];
-      playerA = args.slice(0, -1).join(' ');
+      // If last two args are numbers, they are odds
+      if (args.length >= 4 && !isNaN(parseFloat(args[args.length - 2])) && !isNaN(parseFloat(args[args.length - 1]))) {
+        oddsB = parseFloat(args[args.length - 1]);
+        oddsA = parseFloat(args[args.length - 2]);
+        playerB = args[args.length - 3];
+        playerA = args.slice(0, -3).join(' ');
+      } else {
+        playerB = args[args.length - 1];
+        playerA = args.slice(0, -1).join(' ');
+      }
     }
 
     if (!playerA || !playerB) {
-      await message.reply({ embeds: [embeds.error('Invalid Usage', 'Usage: `mochi creatematch <PlayerA> <PlayerB>`')] });
+      await message.reply({ embeds: [embeds.error('Invalid Usage', 'Usage: `mochi creatematch <PlayerA> vs <PlayerB> [OddsA] [OddsB]`')] });
       return;
     }
 
@@ -47,6 +62,8 @@ const bettingCommands = {
         player_b: playerB,
         status: 'open',
         winner: null,
+        odds_a: oddsA,
+        odds_b: oddsB,
         created_by: message.author.id,
       })
       .select()
@@ -54,9 +71,10 @@ const bettingCommands = {
 
     if (error) throw error;
 
+    const oddsInfo = oddsA && oddsB ? `\n📈 **Odds:** ${oddsA}x vs ${oddsB}x` : '';
     const embed = embeds.betting(
       '🔥 New Match Created!',
-      `**Match #${match.id}**\n🟦 **${playerA}** vs 🟥 **${playerB}**\n\nPlace your bets with \`mochi support ${playerA} <amount>\` or \`mochi support ${playerB} <amount>\``
+      `**Match #${match.id}**\n🟦 **${playerA}** vs 🟥 **${playerB}**${oddsInfo}\n\nPlace your bets with \`mochi support ${playerA} <amount>\` or \`mochi support ${playerB} <amount>\``
     );
     await message.reply({ embeds: [embed] });
   },
@@ -93,7 +111,10 @@ const bettingCommands = {
       return;
     }
 
-    const entries = matches.map((m) => `**#${m.id}** — 🟦 **${m.player_a}** vs 🟥 **${m.player_b}**`);
+    const entries = matches.map((m) => {
+      const oddsText = m.odds_a && m.odds_b ? ` *(${m.odds_a}x vs ${m.odds_b}x)*` : '';
+      return `**#${m.id}** — 🟦 **${m.player_a}** vs 🟥 **${m.player_b}**${oddsText}`;
+    });
 
     const embed = embeds.betting(
       `🎲 Open Matches (Page ${page}/${totalPages})`,
@@ -136,9 +157,10 @@ const bettingCommands = {
     const totalB = betsOnB.reduce((sum, b) => sum + b.amount, 0);
     const totalPool = totalA + totalB;
 
+    const oddsInfo = match.odds_a && match.odds_b ? `\n📈 Odds: **${match.odds_a}x** vs **${match.odds_b}x**` : '';
     const embed = embeds.betting(
       `📊 Match #${match.id} Info`,
-      `🟦 **${match.player_a}** vs 🟥 **${match.player_b}**\nStatus: **${match.status.toUpperCase()}**${match.winner ? `\nWinner: **${match.winner}**` : ''}`
+      `🟦 **${match.player_a}** vs 🟥 **${match.player_b}**\nStatus: **${match.status.toUpperCase()}**${oddsInfo}${match.winner ? `\nWinner: **${match.winner}**` : ''}`
     );
 
     embed.addFields(
@@ -304,24 +326,41 @@ const bettingCommands = {
     if (updateError) throw updateError;
 
     // Distribute winnings
-    if (winningBets.length > 0 && totalPool > 0) {
+    const hasFixedOdds = match.odds_a && match.odds_b;
+    const winningOdds = winnerA ? parseFloat(match.odds_a) : parseFloat(match.odds_b);
+
+    if (winningBets.length > 0) {
       for (const bet of winningBets) {
-        // Proportional payout based on the bet size relative to total winning bets pool
-        const share = Math.floor((bet.amount / totalWinningAmount) * totalPool);
+        let share;
+        let payoutNote;
+        
+        if (hasFixedOdds) {
+          // Fixed odds payout (multiplier * bet)
+          share = Math.floor(bet.amount * winningOdds);
+          payoutNote = `Won bet on Match #${matchId} — ${actualWinner} won! (Odds: ${winningOdds}x, Bet: ${bet.amount}, Return: ${share})`;
+        } else {
+          // Proportional payout based on the bet size relative to total winning bets pool
+          share = Math.floor((bet.amount / totalWinningAmount) * totalPool);
+          payoutNote = `Won bet on Match #${matchId} — ${actualWinner} won! (Bet: ${bet.amount}, Won: ${share})`;
+        }
         
         await credit(
           bet.user_id,
           guildId,
           share,
           'match_win',
-          `Won bet on Match #${matchId} — ${actualWinner} won! (Bet: ${bet.amount}, Won: ${share})`
+          payoutNote
         );
       }
     }
 
+    const payoutTypeDesc = hasFixedOdds 
+      ? `Winnings distributed based on set odds: **${winningOdds}x**!`
+      : `Winnings distributed proportionally to the winners' bet amounts!`;
+
     const embed = embeds.success(
       'Match Ended! 🏆',
-      `Match #${match.id}: **${match.player_a}** vs **${match.player_b}**\n**Winner: ${actualWinner}**\n\n💰 **${totalPool.toLocaleString()}** coins in the pool\n🏅 **${winningBets.length}** winning bet(s)\n${winningBets.length > 0 ? `Winnings have been distributed proportionally to the winners' bet amounts!` : 'No winners — all bets were on the losing side.'}`
+      `Match #${match.id}: **${match.player_a}** vs **${match.player_b}**\n**Winner: ${actualWinner}**\n\n💰 **${totalPool.toLocaleString()}** coins in the pool\n🏅 **${winningBets.length}** winning bet(s)\n${winningBets.length > 0 ? payoutTypeDesc : 'No winners — all bets were on the losing side.'}`
     );
     await message.reply({ embeds: [embed] });
   },

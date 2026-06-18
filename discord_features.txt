@@ -32,8 +32,8 @@
 • `give @user <amount>` — Grant coins to a user
 • `setbudget @user <amount>` — Set tournament budget
 • `addplayer <name> <price>` — Add player to the pool
-• `creatematch <playerA> vs <playerB>` — Open new match for betting
-• `endmatch <id> <winner>` — Set winner & distribute proportional bets
+• `creatematch <playerA> vs <playerB> [OddsA] [OddsB]` — Open new match for betting (optional fixed odds)
+• `endmatch <id> <winner>` — Set winner & distribute wins (supports set odds or proportional payouts)
 • `cancelmatch <id>` — Cancel match & refund all bets
 • `additem` — Add shop item (supports quoted names/descriptions)
 • `removeitem <item>` — Soft-delete item (users keep purchased copies)

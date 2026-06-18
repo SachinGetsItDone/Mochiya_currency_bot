@@ -89,6 +89,8 @@ CREATE TABLE IF NOT EXISTS matches (
   player_b TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'closed', 'cancelled')),
   winner TEXT,
+  odds_a NUMERIC(5,2), -- Odds multiplier for Player A (e.g. 1.15)
+  odds_b NUMERIC(5,2), -- Odds multiplier for Player B (e.g. 2.00)
   created_by TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
