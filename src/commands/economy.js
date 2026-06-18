@@ -238,6 +238,88 @@ const economyCommands = {
     );
     await message.reply({ embeds: [embed] });
   },
+  // ─── airdrop (admin) ───
+  async airdrop(message, args, guildId) {
+    if (!isAdmin(message.member)) {
+      return message.reply({ embeds: [embeds.error('Admin Only', 'You need **Administrator** permission to use this command.')] });
+    }
+
+    const amount = parseInt(args[0]);
+    if (isNaN(amount) || amount <= 0) {
+      return message.reply({ embeds: [embeds.error('Invalid Amount', 'Usage: `mochi airdrop <amount> <@role>`\nPlease provide a valid positive amount.')] });
+    }
+
+    const targetRole = message.mentions.roles.first();
+    if (!targetRole) {
+      return message.reply({ embeds: [embeds.error('Invalid Role', 'Usage: `mochi airdrop <amount> <@role>`\nPlease mention a role.')] });
+    }
+
+    const processingMsg = await message.reply(`⏳ Airdropping **${amount.toLocaleString()}** coins to everyone with the <@&${targetRole.id}> role. Please wait...`);
+
+    try {
+      // Fetch members with the role
+      await message.guild.members.fetch();
+      const members = targetRole.members.filter(m => !m.user.bot);
+      
+      if (members.size === 0) {
+        return processingMsg.edit({ content: null, embeds: [embeds.error('No Members', 'No non-bot members found with that role.')] });
+      }
+
+      // Process in chunks to prevent connection pooling limits
+      const memberIds = Array.from(members.keys());
+      const chunkSize = 20;
+      for (let i = 0; i < memberIds.length; i += chunkSize) {
+        const chunk = memberIds.slice(i, i + chunkSize);
+        await Promise.all(chunk.map(id => credit(id, guildId, amount, 'airdrop', `Airdrop to role ${targetRole.name}`)));
+      }
+
+      const embed = embeds.success(
+        'Airdrop Complete! 💸',
+        `Successfully gave **${amount.toLocaleString()}** coins to **${members.size}** members with the <@&${targetRole.id}> role!`
+      );
+      await processingMsg.edit({ content: null, embeds: [embed] });
+    } catch (error) {
+      console.error('Airdrop error:', error);
+      await processingMsg.edit({ content: null, embeds: [embeds.error('Airdrop Failed', 'An error occurred during the airdrop.')] });
+    }
+  },
+
+  // ─── massgive (admin) ───
+  async massgive(message, args, guildId) {
+    if (!isAdmin(message.member)) {
+      return message.reply({ embeds: [embeds.error('Admin Only', 'You need **Administrator** permission to use this command.')] });
+    }
+
+    const amount = parseInt(args[0]);
+    if (isNaN(amount) || amount <= 0) {
+      return message.reply({ embeds: [embeds.error('Invalid Amount', 'Usage: `mochi massgive <amount> <@user1> <@user2> ...`\nPlease provide a valid positive amount.')] });
+    }
+
+    const targets = message.mentions.users.filter(u => !u.bot);
+    if (targets.size === 0) {
+      return message.reply({ embeds: [embeds.error('Invalid Targets', 'Please mention at least one non-bot user.')] });
+    }
+
+    const processingMsg = await message.reply(`⏳ Distributing **${amount.toLocaleString()}** coins to **${targets.size}** users. Please wait...`);
+
+    try {
+      const userIds = Array.from(targets.keys());
+      const chunkSize = 20;
+      for (let i = 0; i < userIds.length; i += chunkSize) {
+        const chunk = userIds.slice(i, i + chunkSize);
+        await Promise.all(chunk.map(id => credit(id, guildId, amount, 'massgive', `Mass give from admin ${message.author.username}`)));
+      }
+
+      const embed = embeds.success(
+        'Mass Give Complete! 💸',
+        `Successfully gave **${amount.toLocaleString()}** coins to **${targets.size}** users!`
+      );
+      await processingMsg.edit({ content: null, embeds: [embed] });
+    } catch (error) {
+      console.error('Massgive error:', error);
+      await processingMsg.edit({ content: null, embeds: [embeds.error('Mass Give Failed', 'An error occurred during mass give.')] });
+    }
+  },
 };
 
 module.exports = economyCommands;
