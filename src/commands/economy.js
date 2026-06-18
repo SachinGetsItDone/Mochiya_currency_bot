@@ -267,7 +267,7 @@ const economyCommands = {
 
       // Process in chunks to prevent connection pooling limits
       const memberIds = Array.from(members.keys());
-      const chunkSize = 20;
+      const chunkSize = 10;
       for (let i = 0; i < memberIds.length; i += chunkSize) {
         const chunk = memberIds.slice(i, i + chunkSize);
         await Promise.all(chunk.map(id => credit(id, guildId, amount, 'airdrop', `Airdrop to role ${targetRole.name}`)));
@@ -304,7 +304,7 @@ const economyCommands = {
 
     try {
       const userIds = Array.from(targets.keys());
-      const chunkSize = 20;
+      const chunkSize = 10;
       for (let i = 0; i < userIds.length; i += chunkSize) {
         const chunk = userIds.slice(i, i + chunkSize);
         await Promise.all(chunk.map(id => credit(id, guildId, amount, 'massgive', `Mass give from admin ${message.author.username}`)));
