@@ -75,13 +75,12 @@ const bettingCommands = {
 
     const embed = new (require('discord.js').EmbedBuilder)()
       .setColor(0x00FF00)
-      .setTitle('🏏 Live Match Dashboard')
-      .setDescription('National teams. Test match. 2nd Test')
+      .setTitle('🎲 Live Match Dashboard')
+      .setDescription(`🏆 **Match #${match.id}** is now open for betting! Click the buttons below or type the command to place your support.`)
       .addFields(
-        { name: 'INNINGS 1 🏟️', value: `🏴󠁧󠁢󠁥󠁮󠁧󠁿 **${playerA}**\n🇳🇿 **${playerB}**`, inline: true },
-        { name: 'SCORE', value: `🏏 *142/2(33.4)* **142**\n⚪ *391/10* **391**`, inline: true }
+        { name: 'Competitors', value: `🟦 **${playerA}**\n\n**vs**\n\n🟥 **${playerB}**`, inline: false }
       )
-      .setFooter({ text: `Match #${match.id}` })
+      .setFooter({ text: `Mochi Match System` })
       .setTimestamp();
 
     const buttonLabelA = oddsA ? `${oddsA.toFixed(2)} (1)` : `Bet ${playerA}`;
@@ -181,19 +180,15 @@ const bettingCommands = {
 
     const embed = new (require('discord.js').EmbedBuilder)()
       .setColor(0x00FF00)
-      .setTitle(`📊 Match #${match.id} Info`)
-      .setDescription('National teams. Test match. 2nd Test')
+      .setTitle(`📊 Match #${match.id} Details`)
+      .setDescription(`Status: **${match.status.toUpperCase()}**${match.winner ? `\nWinner: **${match.winner}**` : ''}`)
       .addFields(
-        { name: `🏴󠁧󠁢󠁥󠁮󠁧󠁿 ${match.player_a}`, value: `Bets: **${betsOnA.length}**\nTotal: **${totalA.toLocaleString()}** coins\nOdds: **${match.odds_a ? match.odds_a + 'x' : 'Dynamic'}**`, inline: true },
-        { name: `🇳🇿 ${match.player_b}`, value: `Bets: **${betsOnB.length}**\nTotal: **${totalB.toLocaleString()}** coins\nOdds: **${match.odds_b ? match.odds_b + 'x' : 'Dynamic'}**`, inline: true },
+        { name: `🟦 ${match.player_a}`, value: `Bets: **${betsOnA.length}**\nTotal: **${totalA.toLocaleString()}** coins\nOdds: **${match.odds_a ? match.odds_a + 'x' : 'Dynamic'}**`, inline: true },
+        { name: `🟥 ${match.player_b}`, value: `Bets: **${betsOnB.length}**\nTotal: **${totalB.toLocaleString()}** coins\nOdds: **${match.odds_b ? match.odds_b + 'x' : 'Dynamic'}**`, inline: true },
         { name: '💰 Total Pool', value: `**${totalPool.toLocaleString()}** coins`, inline: true }
-      );
-
-    embed.addFields(
-      { name: `🟦 ${match.player_a}`, value: `Bets: **${betsOnA.length}**\nTotal: **${totalA.toLocaleString()}** coins`, inline: true },
-      { name: `🟥 ${match.player_b}`, value: `Bets: **${betsOnB.length}**\nTotal: **${totalB.toLocaleString()}** coins`, inline: true },
-      { name: '💰 Total Pool', value: `**${totalPool.toLocaleString()}** coins`, inline: true }
-    );
+      )
+      .setFooter({ text: 'Mochi Match System' })
+      .setTimestamp();
 
     await message.reply({ embeds: [embed] });
   },
