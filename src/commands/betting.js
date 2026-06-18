@@ -76,13 +76,13 @@ const bettingCommands = {
     const embed = new (require('discord.js').EmbedBuilder)()
       .setColor(0x00FF00)
       .setTitle('🎲 Live Match Dashboard')
-      .setDescription(`🏆 **Match #${match.id}** is now open for betting! Click the buttons below or type the command to place your support.`)
+      .setDescription(`🏆 A new match is now open for betting!\nClick the buttons below or use \`mochi support <player> <amount>\` to place your bet.`)
       .addFields(
         { name: `🟦 ${playerA}`, value: oddsA ? `📈 **${oddsA.toFixed(2)}x**` : '\u200b', inline: true },
-        { name: '\u200b', value: '**VS**', inline: true },
+        { name: 'VS', value: '\u200b', inline: true },
         { name: `🟥 ${playerB}`, value: oddsB ? `📈 **${oddsB.toFixed(2)}x**` : '\u200b', inline: true }
       )
-      .setFooter({ text: `Mochi Match System` })
+      .setFooter({ text: 'Mochi Match System' })
       .setTimestamp();
 
     const buttonLabelA = oddsA ? `${oddsA.toFixed(2)} (1)` : `Bet ${playerA}`;
@@ -135,13 +135,13 @@ const bettingCommands = {
     }
 
     const entries = matches.map((m) => {
-      const oddsText = m.odds_a && m.odds_b ? `\n🟩 **${m.odds_a}x** (1)  |  🟥 **${m.odds_b}x** (2)` : '';
-      return `**Match #${m.id}**\n🏴󠁧󠁢󠁥󠁮󠁧󠁿 **${m.player_a}** vs 🇳🇿 **${m.player_b}**${oddsText}\n───────────────────`;
+      const oddsText = m.odds_a && m.odds_b ? `\n📈 **${m.odds_a}x** (1)  |  📈 **${m.odds_b}x** (2)` : '';
+      return `🟦 **${m.player_a}** vs 🟥 **${m.player_b}**${oddsText}\n───────────────────`;
     });
 
     const embed = embeds.betting(
       `🎲 Open Matches (Page ${page}/${totalPages})`,
-      entries.join('\n') + '\nUse `mochi matchinfo <id>` for details.'
+      entries.join('\n')
     );
     await message.reply({ embeds: [embed] });
   },
@@ -182,8 +182,8 @@ const bettingCommands = {
 
     const embed = new (require('discord.js').EmbedBuilder)()
       .setColor(0x00FF00)
-      .setTitle(`📊 Match #${match.id} Details`)
-      .setDescription(`Status: **${match.status.toUpperCase()}**${match.winner ? `\nWinner: **${match.winner}**` : ''}`)
+      .setTitle(`📊 Match Details`)
+      .setDescription(`**${match.player_a}** vs **${match.player_b}**\nStatus: **${match.status.toUpperCase()}**${match.winner ? `\n🏆 Winner: **${match.winner}**` : ''}`)
       .addFields(
         { name: `🟦 ${match.player_a}`, value: `Bets: **${betsOnA.length}**\nTotal: **${totalA.toLocaleString()}** coins\nOdds: **${match.odds_a ? match.odds_a + 'x' : 'Dynamic'}**`, inline: true },
         { name: `🟥 ${match.player_b}`, value: `Bets: **${betsOnB.length}**\nTotal: **${totalB.toLocaleString()}** coins\nOdds: **${match.odds_b ? match.odds_b + 'x' : 'Dynamic'}**`, inline: true },
@@ -383,7 +383,7 @@ const bettingCommands = {
 
     const embed = embeds.success(
       'Match Ended! 🏆',
-      `Match #${match.id}: **${match.player_a}** vs **${match.player_b}**\n**Winner: ${actualWinner}**\n\n💰 **${totalPool.toLocaleString()}** coins in the pool\n🏅 **${winningBets.length}** winning bet(s)\n${winningBets.length > 0 ? payoutTypeDesc : 'No winners — all bets were on the losing side.'}`
+      `**${match.player_a}** vs **${match.player_b}**\n🏆 **Winner: ${actualWinner}**\n\n💰 **${totalPool.toLocaleString()}** coins in the pool\n🏅 **${winningBets.length}** winning bet(s)\n${winningBets.length > 0 ? payoutTypeDesc : 'No winners — all bets were on the losing side.'}`
     );
     await message.reply({ embeds: [embed] });
   },
@@ -447,7 +447,7 @@ const bettingCommands = {
 
     const embed = embeds.warning(
       'Match Cancelled ⛔',
-      `Match #${match.id}: **${match.player_a}** vs **${match.player_b}** has been cancelled.\n\n${bets?.length > 0 ? `💰 Refunded **${totalRefunded.toLocaleString()}** coins to **${bets.length}** bet(s).` : 'No bets to refund.'}`
+      `**${match.player_a}** vs **${match.player_b}** has been cancelled.\n\n${bets?.length > 0 ? `💰 Refunded **${totalRefunded.toLocaleString()}** coins to **${bets.length}** bet(s).` : 'No bets to refund.'}`
     );
     await message.reply({ embeds: [embed] });
   },
