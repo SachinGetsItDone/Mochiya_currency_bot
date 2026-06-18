@@ -49,6 +49,19 @@ const bettingCommands = {
       return;
     }
 
+    // Clean up mentions into usernames so buttons/embeds look nice
+    const cleanMention = (str) => {
+      const matchStr = str.match(/^<@!?(\d+)>$/);
+      if (matchStr) {
+        const user = message.mentions.users.get(matchStr[1]) || message.client.users.cache.get(matchStr[1]);
+        return user ? (user.globalName || user.username) : str;
+      }
+      return str;
+    };
+
+    playerA = cleanMention(playerA);
+    playerB = cleanMention(playerB);
+
     if (playerA.toLowerCase() === playerB.toLowerCase()) {
       await message.reply({ embeds: [embeds.error('Invalid Match', 'A player cannot compete against themselves!')] });
       return;
