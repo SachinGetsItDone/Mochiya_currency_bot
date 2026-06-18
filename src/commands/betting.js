@@ -78,7 +78,9 @@ const bettingCommands = {
       .setTitle('🎲 Live Match Dashboard')
       .setDescription(`🏆 **Match #${match.id}** is now open for betting! Click the buttons below or type the command to place your support.`)
       .addFields(
-        { name: 'Competitors', value: `🟦 **${playerA}**\n\n**vs**\n\n🟥 **${playerB}**`, inline: false }
+        { name: `🟦 ${playerA}`, value: oddsA ? `📈 **${oddsA.toFixed(2)}x**` : '\u200b', inline: true },
+        { name: '\u200b', value: '**VS**', inline: true },
+        { name: `🟥 ${playerB}`, value: oddsB ? `📈 **${oddsB.toFixed(2)}x**` : '\u200b', inline: true }
       )
       .setFooter({ text: `Mochi Match System` })
       .setTimestamp();
