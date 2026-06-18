@@ -2,6 +2,7 @@ const { supabase } = require('../utils/supabase');
 const { getBalance, debit } = require('../utils/wallet');
 const { isAdmin, canManageRole } = require('../utils/permissions');
 const embeds = require('../utils/embeds');
+const config = require('../config');
 
 const RARITY_ORDER = { 'common': 1, 'rare': 2, 'epic': 3, 'legendary': 4 };
 

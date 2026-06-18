@@ -23,7 +23,7 @@ const bettingCommands = {
     if (vsIndex !== -1) {
       playerA = args.slice(0, vsIndex).join(' ');
       const rest = args.slice(vsIndex + 1);
-      
+
       // Check if last two args are numbers (odds)
       if (rest.length >= 3 && !isNaN(parseFloat(rest[rest.length - 2])) && !isNaN(parseFloat(rest[rest.length - 1]))) {
         oddsB = parseFloat(rest.pop());
@@ -175,7 +175,7 @@ const bettingCommands = {
 
     const betsOnA = bets?.filter((b) => b.supported.toLowerCase() === match.player_a.toLowerCase()) || [];
     const betsOnB = bets?.filter((b) => b.supported.toLowerCase() === match.player_b.toLowerCase()) || [];
-    
+
     const totalA = betsOnA.reduce((sum, b) => sum + b.amount, 0);
     const totalB = betsOnB.reduce((sum, b) => sum + b.amount, 0);
     const totalPool = totalA + totalB;
@@ -229,7 +229,7 @@ const bettingCommands = {
     // Validate the player name matches one of the competitors
     const isPlayerA = match.player_a.toLowerCase() === playerName.toLowerCase();
     const isPlayerB = match.player_b.toLowerCase() === playerName.toLowerCase();
-    
+
     if (!isPlayerA && !isPlayerB) {
       await message.reply({ embeds: [embeds.error('Invalid Player', `**${playerName}** is not competing in Match #${match.id}. The competitors are **${match.player_a}** and **${match.player_b}**.`)] });
       return;
@@ -321,7 +321,7 @@ const bettingCommands = {
     // Validate winner name
     const winnerA = match.player_a.toLowerCase() === winnerName.toLowerCase();
     const winnerB = match.player_b.toLowerCase() === winnerName.toLowerCase();
-    
+
     if (!winnerA && !winnerB) {
       await message.reply({ embeds: [embeds.error('Invalid Winner', `**${winnerName}** is not a competitor in Match #${matchId}. The competitors are **${match.player_a}** and **${match.player_b}**.`)] });
       return;
@@ -356,7 +356,7 @@ const bettingCommands = {
       for (const bet of winningBets) {
         let share;
         let payoutNote;
-        
+
         if (hasFixedOdds) {
           // Fixed odds payout (multiplier * bet)
           share = Math.floor(bet.amount * winningOdds);
@@ -366,7 +366,7 @@ const bettingCommands = {
           share = Math.floor((bet.amount / totalWinningAmount) * totalPool);
           payoutNote = `Won bet on Match #${matchId} — ${actualWinner} won! (Bet: ${bet.amount}, Won: ${share})`;
         }
-        
+
         await credit(
           bet.user_id,
           guildId,
@@ -377,7 +377,7 @@ const bettingCommands = {
       }
     }
 
-    const payoutTypeDesc = hasFixedOdds 
+    const payoutTypeDesc = hasFixedOdds
       ? `Winnings distributed based on set odds: **${winningOdds}x**!`
       : `Winnings distributed proportionally to the winners' bet amounts!`;
 
