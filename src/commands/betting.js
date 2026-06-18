@@ -73,15 +73,15 @@ const bettingCommands = {
 
     if (error) throw error;
 
+    const oddsText = oddsA && oddsB 
+      ? `🟦 **${oddsA.toFixed(2)}x**  |  🟥 **${oddsB.toFixed(2)}x**` 
+      : 'Dynamic (Based on pool)';
+
     const embed = new (require('discord.js').EmbedBuilder)()
       .setColor(0x00FF00)
       .setTitle('🎲 Live Match Dashboard')
-      .setDescription(`🏆 A new match is now open for betting!\nClick the buttons below or use \`mochi support <player> <amount>\` to place your bet.`)
-      .addFields(
-        { name: `🟦 ${playerA}`, value: oddsA ? `📈 **${oddsA.toFixed(2)}x**` : '\u200b', inline: true },
-        { name: 'VS', value: '\u200b', inline: true },
-        { name: `🟥 ${playerB}`, value: oddsB ? `📈 **${oddsB.toFixed(2)}x**` : '\u200b', inline: true }
-      )
+      .setDescription(`🏆 A new match is now open for betting!\nClick the buttons below or use \`mochi support <player> <amount>\` to place your bet.\n\n### 🟦 ${playerA} \u00A0\u00A0**VS**\u00A0\u00A0 🟥 ${playerB}`)
+      .addFields({ name: '📊 Payout Odds', value: oddsText })
       .setFooter({ text: 'Mochi Match System' })
       .setTimestamp();
 
