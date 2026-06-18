@@ -10,14 +10,12 @@ const DAILY_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 hours
 const economyCommands = {
   // ─── cash ───
   async cash(message, args, guildId) {
-    const target = message.mentions.users.first() || message.author;
+    const target = message.author;
     const balance = await getBalance(target.id, guildId);
     
     const embed = embeds.economy(
       '💰 Mochi Coin Balance',
-      target.id === message.author.id
-        ? `You have **${balance.toLocaleString()}** Mochi Coins 🪙`
-        : `**${target.username}** has **${balance.toLocaleString()}** Mochi Coins 🪙`,
+      `You have **${balance.toLocaleString()}** Mochi Coins 🪙`,
       target
     );
     

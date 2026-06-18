@@ -138,8 +138,6 @@ async function sendHelp(message) {
       .setDescription(`
 • \`cash       \` — Check your balance
 
-• \`cash @user \` — Check another user's balance
-
 • \`daily      \` — Claim daily coins (24h cooldown)
 
 • \`pay @user  \` — Transfer coins

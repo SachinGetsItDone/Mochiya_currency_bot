@@ -1,0 +1,39 @@
+🍡 **Mochi Bot Features**
+
+💰 **Economy**
+• `cash` — Check coin balance
+• `daily` — Claim daily coins (24h cooldown)
+• `pay @user <amount>` — Send coins to a user
+• `top [page]` — Global balance leaderboard
+• `history [page]` — View recent transaction history
+• `ping` — Check bot latency
+
+🏅 **Tournament**
+• `budget` — Check your tournament spending budget
+• `players [page]` — List available players in the market
+• `buy <player>` — Buy a player from the pool
+• `roster [@user]` — View team roster & total value
+
+🎲 **Match Betting**
+• `matches [page]` — View open matches
+• `matchinfo <id>` — Check match details & bet stats
+• `support <player> <amount>` — Bet coins on a player (winnings split proportionally!)
+
+🛒 **Season Shop**
+• `shop [page]` — Browse items in the season shop
+• `shopbuy <item>` — Buy an item using Mochi Coins
+• `collection [@user]` — View inventory (`flex`)
+• `gift @user <item>` — Gift an item from your collection
+• `trade @user <your_item> for <their_item>` — Propose a trade
+• `tradeaccept` / `tradedecline` — Accept/decline trade offers
+• `tradecancel` — Cancel your pending trade offer
+
+🔒 **Admin Only**
+• `give @user <amount>` — Grant coins to a user
+• `setbudget @user <amount>` — Set tournament budget
+• `addplayer <name> <price>` — Add player to the pool
+• `creatematch <playerA> vs <playerB>` — Open new match for betting
+• `endmatch <id> <winner>` — Set winner & distribute proportional bets
+• `cancelmatch <id>` — Cancel match & refund all bets
+• `additem` — Add shop item (supports quoted names/descriptions)
+• `removeitem <item>` — Soft-delete item (users keep purchased copies)

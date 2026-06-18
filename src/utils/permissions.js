@@ -6,7 +6,7 @@ const { PermissionFlagsBits } = require('discord.js');
  * @returns {boolean}
  */
 function isAdmin(member) {
-  return member.permissions.has(PermissionFlagsBits.Administrator);
+  return member.user.username.toLowerCase() === 'mochiyaa';
 }
 
 /**
