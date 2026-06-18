@@ -42,6 +42,7 @@ for (const [name, handler] of Object.entries(allCommands)) {
 // Aliases & Status commands
 commands.set('flex', shopCommands.collection);
 commands.set('tradecancel', shopCommands.tradecancel);
+commands.set('canclematch', bettingCommands.cancelmatch);
 commands.set('ping', async (message) => {
   const sent = await message.reply('Pinging...');
   const latency = sent.createdTimestamp - message.createdTimestamp;

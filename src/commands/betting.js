@@ -79,7 +79,7 @@ const bettingCommands = {
 
     const embed = new (require('discord.js').EmbedBuilder)()
       .setColor(0x00FF00)
-      .setTitle('🎲 Live Match Dashboard')
+      .setTitle(`🎲 Live Match Dashboard (ID: #${match.id})`)
       .setDescription(`🏆 A new match is now open for betting!\nClick the buttons below or use \`mochi support <player> <amount>\` to place your bet.\n\n### 🟦 ${playerA} \u00A0\u00A0**VS**\u00A0\u00A0 🟥 ${playerB}`)
       .addFields({ name: '📊 Payout Odds', value: oddsText })
       .setFooter({ text: 'Mochi Match System' })
