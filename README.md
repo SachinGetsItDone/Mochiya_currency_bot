@@ -1,0 +1,1 @@
+# Mochiya_currency_bot
