@@ -1,5 +1,7 @@
 const { Client, GatewayIntentBits, Partials, Collection } = require('discord.js');
 const config = require('./config');
+const { supabase } = require('./utils/supabase');
+const { getBalance, credit, debit } = require('./utils/wallet');
 const economyCommands = require('./commands/economy');
 const tournamentCommands = require('./commands/tournament');
 const bettingCommands = require('./commands/betting');
