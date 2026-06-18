@@ -88,50 +88,27 @@ const shopCommands = {
       return;
     }
 
-    // Check if user already owns this item
-    if (await userOwnsItem(message.author.id, guildId, item.id)) {
-      await message.reply({ embeds: [embeds.error('Already Owned', `You already own **${item.name}**. You can only have one of each item.`)] });
-      return;
+    // Call the atomic RPC to handle balance, stock, and inventory securely
+    const { error: rpcError } = await supabase.rpc('buy_item', {
+      p_user_id: message.author.id,
+      p_guild_id: guildId,
+      p_item_id: item.id,
+      p_price: item.price,
+      p_season_label: item.season_label
+    });
+
+    if (rpcError) {
+       let errorMsg = 'An error occurred during purchase.';
+       if (rpcError.message.includes('Insufficient balance')) {
+          errorMsg = `**${item.name}** costs **${item.price.toLocaleString()}** coins. You don't have enough.`;
+       } else if (rpcError.message.includes('Item is out of stock')) {
+          errorMsg = `Sorry, **${item.name}** just sold out!`;
+       } else if (rpcError.message.includes('duplicate key value') || rpcError.message.includes('unique constraint')) {
+          errorMsg = `You already own **${item.name}**. You can only have one of each item.`;
+       }
+       await message.reply({ embeds: [embeds.error('Purchase Failed', errorMsg)] });
+       return;
     }
-
-    // Check wallet balance
-    const balance = await getBalance(message.author.id, guildId);
-    if (balance < item.price) {
-      await message.reply({ embeds: [embeds.error('Insufficient Funds', `**${item.name}** costs **${item.price.toLocaleString()}** coins. You only have **${balance.toLocaleString()}** coins.`)] });
-      return;
-    }
-
-    // If role type, verify bot can assign it
-    if (item.type === 'role' && item.role_id) {
-      const check = canManageRole(message.guild, item.role_id);
-      if (!check.canManage) {
-        await message.reply({ embeds: [embeds.error('Role Error', check.reason)] });
-        return;
-      }
-    }
-
-    // Deduct coins
-    await debit(message.author.id, guildId, item.price, 'shop_purchase', `Bought ${item.name}`);
-
-    // Decrease stock
-    const { error: stockError } = await supabase
-      .from('shop_items')
-      .update({ stock_remaining: item.stock_remaining - 1 })
-      .eq('id', item.id);
-
-    if (stockError) throw stockError;
-
-    // Add to inventory
-    const { error: invError } = await supabase
-      .from('user_inventory')
-      .insert({
-        guild_id: guildId,
-        user_id: message.author.id,
-        item_id: item.id,
-        season_label: item.season_label,
-      });
-
-    if (invError) throw invError;
 
     // If role type, assign the role
     if (item.type === 'role' && item.role_id) {
@@ -490,19 +467,23 @@ const shopCommands = {
       return;
     }
 
-    // Check if receiver already owns this item
-    if (await userOwnsItem(target.id, guildId, inventory.item_id)) {
-      await message.reply({ embeds: [embeds.error('Already Owned', `**${target.username}** already owns **${inventory.shop_items.name}**.`)] });
-      return;
+    // Call the atomic RPC to handle the transfer safely
+    const { error: rpcError } = await supabase.rpc('transfer_item', {
+      p_guild_id: guildId,
+      p_sender_id: message.author.id,
+      p_receiver_id: target.id,
+      p_inventory_id: inventory.id,
+      p_item_id: inventory.item_id
+    });
+
+    if (rpcError) {
+       let errorMsg = 'An error occurred during gifting.';
+       if (rpcError.message.includes('duplicate key value') || rpcError.message.includes('unique constraint')) {
+          errorMsg = `**${target.username}** already owns **${inventory.shop_items.name}**.`;
+       }
+       await message.reply({ embeds: [embeds.error('Gift Failed', errorMsg)] });
+       return;
     }
-
-    // Remove from sender's inventory
-    const { error: deleteError } = await supabase
-      .from('user_inventory')
-      .delete()
-      .eq('id', inventory.id);
-
-    if (deleteError) throw deleteError;
 
     // If it's a role, remove from sender and add to receiver
     if (inventory.shop_items.type === 'role' && inventory.shop_items.role_id) {
@@ -523,18 +504,6 @@ const shopCommands = {
         }
       }
     }
-
-    // Add to receiver's inventory
-    const { error: insertError } = await supabase
-      .from('user_inventory')
-      .insert({
-        guild_id: guildId,
-        user_id: target.id,
-        item_id: inventory.item_id,
-        season_label: inventory.season_label,
-      });
-
-    if (insertError) throw insertError;
 
     const embed = embeds.success(
       'Item Gifted! 🎁',

@@ -187,21 +187,6 @@ const tournamentCommands = {
 
     const playerName = args.join(' ');
 
-    // Get player's budget
-    const { data: budget } = await supabase
-      .from('budgets')
-      .select('total, spent')
-      .eq('user_id', message.author.id)
-      .eq('guild_id', guildId)
-      .single();
-
-    if (!budget) {
-      await message.reply({ embeds: [embeds.error('No Budget', 'You do not have a tournament budget. Ask an admin to set one.')] });
-      return;
-    }
-
-    const remaining = budget.total - budget.spent;
-
     // Find the player (case-insensitive)
     const { data: player } = await supabase
       .from('players')
@@ -216,30 +201,40 @@ const tournamentCommands = {
       return;
     }
 
-    if (remaining < player.price) {
-      await message.reply({ embeds: [embeds.error('Insufficient Budget', `You only have **${remaining.toLocaleString()}** coins remaining. **${player.name}** costs **${player.price.toLocaleString()}** coins.`)] });
-      return;
+    // Call the atomic RPC to handle the purchase securely
+    const { error: rpcError } = await supabase.rpc('buy_tournament_player', {
+      p_user_id: message.author.id,
+      p_guild_id: guildId,
+      p_player_id: player.id,
+      p_price: player.price
+    });
+
+    if (rpcError) {
+       let errorMsg = 'An error occurred during purchase.';
+       if (rpcError.message.includes('already been bought')) {
+          errorMsg = `Sorry, someone else just bought **${player.name}**!`;
+       } else if (rpcError.message.includes('Insufficient tournament budget')) {
+          errorMsg = `You don't have enough budget. **${player.name}** costs **${player.price.toLocaleString()}** coins.`;
+       } else if (rpcError.message.includes('No tournament budget')) {
+          errorMsg = `You do not have a tournament budget. Ask an admin to set one.`;
+       }
+       await message.reply({ embeds: [embeds.error('Purchase Failed', errorMsg)] });
+       return;
     }
 
-    // Purchase: update player owner and budget spent
-    const { error: playerError } = await supabase
-      .from('players')
-      .update({ owner_id: message.author.id })
-      .eq('id', player.id);
-
-    if (playerError) throw playerError;
-
-    const { error: budgetError } = await supabase
+    // Fetch updated budget for the success message
+    const { data: newBudget } = await supabase
       .from('budgets')
-      .update({ spent: budget.spent + player.price })
+      .select('total, spent')
       .eq('user_id', message.author.id)
-      .eq('guild_id', guildId);
+      .eq('guild_id', guildId)
+      .single();
 
-    if (budgetError) throw budgetError;
+    const remaining = newBudget ? newBudget.total - newBudget.spent : 0;
 
     const embed = embeds.success(
       'Player Purchased! ⚽',
-      `You bought **${player.name}** for **${player.price.toLocaleString()}** coins!\nBudget remaining: **${(remaining - player.price).toLocaleString()}** coins`
+      `You bought **${player.name}** for **${player.price.toLocaleString()}** coins!\nBudget remaining: **${remaining.toLocaleString()}** coins`
     );
     await message.reply({ embeds: [embed] });
   },
