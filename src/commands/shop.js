@@ -216,6 +216,79 @@ const shopCommands = {
       return;
     }
 
+    if (args.length === 0) {
+      // INTERACTIVE WIZARD
+      const filter = (m) => m.author.id === message.author.id;
+      const prompt = async (text) => {
+        await message.channel.send({ embeds: [embeds.info('🛠️ Item Setup Wizard', text + '\n\n*(Type `cancel` to stop)*')] });
+        try {
+          const collected = await message.channel.awaitMessages({ filter, max: 1, time: 60000, errors: ['time'] });
+          const reply = collected.first();
+          if (reply.content.toLowerCase() === 'cancel') throw new Error('cancelled');
+          return reply.content;
+        } catch (e) {
+          await message.channel.send({ embeds: [embeds.warning('Setup Cancelled', 'Item setup wizard was cancelled or timed out.')] });
+          return null;
+        }
+      };
+
+      const name = await prompt('**Step 1/7:** What is the **Name** of the item?');
+      if (!name) return;
+
+      const priceStr = await prompt(`**Step 2/7:** What is the **Price** for **${name}**?`);
+      if (!priceStr) return;
+      const price = parseInt(priceStr);
+      if (isNaN(price) || price < 0) return message.channel.send('❌ Invalid price. Please start over.');
+
+      const stockStr = await prompt('**Step 3/7:** How many items should be in **Stock**?');
+      if (!stockStr) return;
+      const stock = parseInt(stockStr);
+      if (isNaN(stock) || stock < 1) return message.channel.send('❌ Invalid stock. Please start over.');
+
+      const typeStr = await prompt('**Step 4/7:** Is this a **role** or a **collectible**?');
+      if (!typeStr) return;
+      const type = typeStr.toLowerCase();
+      if (!['role', 'collectible'].includes(type)) return message.channel.send('❌ Invalid type. Please start over.');
+
+      let roleId = null;
+      if (type === 'role') {
+        const roleStr = await prompt('**Step 4.5/7:** Please mention the role or paste its **Role ID**.');
+        if (!roleStr) return;
+        const match = roleStr.match(/\d{17,20}/);
+        if (!match) return message.channel.send('❌ Invalid role ID. Please start over.');
+        roleId = match[0];
+      }
+
+      const rarityStr = await prompt('**Step 5/7:** What is the **Rarity**? (Common, Rare, Epic, Legendary)');
+      if (!rarityStr) return;
+      const rarity = rarityStr.charAt(0).toUpperCase() + rarityStr.slice(1).toLowerCase();
+      if (!['Common', 'Rare', 'Epic', 'Legendary'].includes(rarity)) return message.channel.send('❌ Invalid rarity. Please start over.');
+
+      const expiryStr = await prompt('**Step 6/7:** How many **Days** until it expires from the shop? (e.g., 30)');
+      if (!expiryStr) return;
+      const days = parseInt(expiryStr);
+      if (isNaN(days) || days < 1) return message.channel.send('❌ Invalid days. Please start over.');
+      const expiryISO = new Date();
+      expiryISO.setDate(expiryISO.getDate() + days);
+
+      const description = await prompt('**Step 7/7:** Finally, provide a brief **Description** for this item:');
+      if (!description) return;
+
+      const { error } = await supabase.from('shop_items').insert({
+        guild_id: guildId, name, description, price, stock, stock_remaining: stock,
+        expiry_date: expiryISO.toISOString(), type, role_id: roleId, rarity,
+        season_label: `Season ${new Date().getFullYear()}`, created_by: message.author.id, is_active: true
+      });
+
+      if (error) {
+        return message.reply({ embeds: [embeds.error('Database Error', error.message)] });
+      }
+
+      await message.reply({ embeds: [embeds.success('Item Added! 🎉', `Successfully added **${name}** to the shop for **${price}** coins.`)] });
+      return;
+    }
+
+    // --- OLD FAST PARSER (if args are provided) ---
     // Robust argument parser that automatically extracts multi-word names without requiring quotes!
     // We find the first argument that is a number (the price) and treat everything before it as the name.
     const rawContent = message.content.slice(config.prefix.length + args[0].length + 2).trim(); // content after prefix + command
@@ -239,7 +312,7 @@ const shopCommands = {
 
     if (priceIndex === -1 || parsedArgs.length < priceIndex + 5) {
       await message.reply({
-        embeds: [embeds.error('Invalid Usage', 'Usage: `mochi additem <name> <price> <stock> <expiry_date (YYYY-MM-DD)> <type (role/collectible)> <rarity (Common/Rare/Epic/Legendary)> <description> [role_id]`')],
+        embeds: [embeds.error('Invalid Usage', 'Usage: `mochi additem` (interactive wizard) OR `mochi additem <name> <price> <stock> <expiry_date> <type> <rarity> <desc> [role_id]`')],
       });
       return;
     }
