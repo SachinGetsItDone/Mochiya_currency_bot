@@ -6,7 +6,8 @@ const { PermissionFlagsBits } = require('discord.js');
  * @returns {boolean}
  */
 function isAdmin(member) {
-  return member.user.username.toLowerCase() === 'mochiyaa';
+  const adminUsernames = ['mochiyaa', '0.zenith', 'akioetto_04239'];
+  return adminUsernames.includes(member.user.username.toLowerCase());
 }
 
 /**

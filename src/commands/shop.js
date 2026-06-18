@@ -215,43 +215,55 @@ const shopCommands = {
       return;
     }
 
-    // Usage: mochi additem <name> <price> <stock> <expiry_date> <type> <rarity> <description...>
-    // Parse arguments supporting quoted strings for name & description
-    // Example: mochi additem "Golden Sword" 500 10 2025-12-31 role Legendary "A legendary sword" 123456789012345678
-    // We can parse the raw content or use a regex to match arguments including quotes
-    const rawArgs = message.content.slice(config.prefix.length).trim().split(/\s+/).slice(1);
+    // Robust argument parser that automatically extracts multi-word names without requiring quotes!
+    // We find the first argument that is a number (the price) and treat everything before it as the name.
+    const rawContent = message.content.slice(config.prefix.length + args[0].length + 2).trim(); // content after prefix + command
     
-    // Better regex-based parser to handle quotes:
+    // Better regex-based parser to handle quotes if present, or split by spaces
     const regex = /[^\s"']+|"([^"]*)"|'([^']*)'/g;
     const parsedArgs = [];
     let match;
-    const rawContent = message.content.slice(config.prefix.length + args[0].length + 1).trim(); // content after prefix + command
     while ((match = regex.exec(rawContent)) !== null) {
       parsedArgs.push(match[1] || match[2] || match[0]);
     }
 
-    if (parsedArgs.length < 6) {
+    // Find the first argument that is a number (excluding the first index itself, which must be name)
+    let priceIndex = -1;
+    for (let i = 1; i < parsedArgs.length; i++) {
+      if (!isNaN(parseInt(parsedArgs[i])) && /^\d+$/.test(parsedArgs[i])) {
+        priceIndex = i;
+        break;
+      }
+    }
+
+    if (priceIndex === -1 || parsedArgs.length < priceIndex + 5) {
       await message.reply({
-        embeds: [embeds.error('Invalid Usage', 'Usage: \`mochi additem "<name>" <price> <stock> <expiry_date (YYYY-MM-DD)> <type (role/collectible)> <rarity (Common/Rare/Epic/Legendary)> "<description>"\`\nFor role items, add the role ID at the end: \`"<description>" [role_id]\`')],
+        embeds: [embeds.error('Invalid Usage', 'Usage: `mochi additem <name> <price> <stock> <expiry_date (YYYY-MM-DD)> <type (role/collectible)> <rarity (Common/Rare/Epic/Legendary)> <description> [role_id]`')],
       });
       return;
     }
 
-    const name = parsedArgs[0];
-    const price = parseInt(parsedArgs[1]);
-    const stock = parseInt(parsedArgs[2]);
-    const expiryDate = parsedArgs[3];
-    const type = parsedArgs[4].toLowerCase();
-    const rarity = parsedArgs[5];
+    const name = parsedArgs.slice(0, priceIndex).join(' ');
+    const price = parseInt(parsedArgs[priceIndex]);
+    const stock = parseInt(parsedArgs[priceIndex + 1]);
+    const expiryDate = parsedArgs[priceIndex + 2];
+    const type = parsedArgs[priceIndex + 3].toLowerCase();
+    const rarity = parsedArgs[priceIndex + 4];
     
+    // Rest of arguments after rarity are description & possibly role_id
+    const remaining = parsedArgs.slice(priceIndex + 5);
+    if (remaining.length === 0) {
+      await message.reply({ embeds: [embeds.error('Invalid Usage', 'Please provide a description for the item.')] });
+      return;
+    }
+
     // Check if last arg looks like a role ID (17-20 digit snowflake)
-    const lastArg = parsedArgs[parsedArgs.length - 1];
+    const lastArg = remaining[remaining.length - 1];
     const roleIdMatch = lastArg.match(/^\d{17,20}$/);
     const roleId = (type === 'role' && roleIdMatch) ? lastArg : null;
     
-    // Description is the 7th argument (index 6). If there are more args and the last one is roleId, join index 6 up to second to last.
-    const descEndIndex = roleId ? parsedArgs.length - 1 : parsedArgs.length;
-    const description = parsedArgs.slice(6, descEndIndex).join(' ');
+    const descEndIndex = roleId ? remaining.length - 1 : remaining.length;
+    const description = remaining.slice(0, descEndIndex).join(' ');
 
     if (!name || name.length > 50) {
       await message.reply({ embeds: [embeds.error('Invalid Name', 'Item name must be 1-50 characters.')] });
