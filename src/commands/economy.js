@@ -131,7 +131,7 @@ const economyCommands = {
 
     const embed = embeds.success(
       'Coins Granted ✨',
-      `Granted **${amount.toLocaleString()}** Mochi Coins to **${target.username}**.\nTheir new balance: **${newBalance.toLocaleString()}** 🪙`,
+      `Granted **${amount.toLocaleString()}** Mochi Coins to <@${target.id}>.\nTheir new balance: **${newBalance.toLocaleString()}** 🪙`,
       target
     );
     await message.reply({ embeds: [embed] });

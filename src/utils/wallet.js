@@ -33,7 +33,7 @@ async function ensureWallet(userId, guildId) {
     .from('wallets')
     .upsert(
       { user_id: userId, guild_id: guildId, balance: 0 },
-      { onConflict: ['user_id', 'guild_id'] }
+      { onConflict: 'user_id, guild_id', ignoreDuplicates: true }
     );
 
   if (error) throw error;
