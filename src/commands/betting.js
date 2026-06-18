@@ -54,6 +54,8 @@ const bettingCommands = {
       return;
     }
 
+    const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+
     const { data: match, error } = await supabase
       .from('matches')
       .insert({
@@ -71,12 +73,32 @@ const bettingCommands = {
 
     if (error) throw error;
 
-    const oddsInfo = oddsA && oddsB ? `\n📈 **Odds:** ${oddsA}x vs ${oddsB}x` : '';
-    const embed = embeds.betting(
-      '🔥 New Match Created!',
-      `**Match #${match.id}**\n🟦 **${playerA}** vs 🟥 **${playerB}**${oddsInfo}\n\nPlace your bets with \`mochi support ${playerA} <amount>\` or \`mochi support ${playerB} <amount>\``
+    const embed = new (require('discord.js').EmbedBuilder)()
+      .setColor(0x00FF00)
+      .setTitle('🏏 Live Match Dashboard')
+      .setDescription('National teams. Test match. 2nd Test')
+      .addFields(
+        { name: 'INNINGS 1 🏟️', value: `🏴󠁧󠁢󠁥󠁮󠁧󠁿 **${playerA}**\n🇳🇿 **${playerB}**`, inline: true },
+        { name: 'SCORE', value: `🏏 *142/2(33.4)* **142**\n⚪ *391/10* **391**`, inline: true }
+      )
+      .setFooter({ text: `Match #${match.id}` })
+      .setTimestamp();
+
+    const buttonLabelA = oddsA ? `${oddsA.toFixed(2)} (1)` : `Bet ${playerA}`;
+    const buttonLabelB = oddsB ? `${oddsB.toFixed(2)} (2)` : `Bet ${playerB}`;
+
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`bet_a_${match.id}`)
+        .setLabel(buttonLabelA)
+        .setStyle(ButtonStyle.Primary),
+      new ButtonBuilder()
+        .setCustomId(`bet_b_${match.id}`)
+        .setLabel(buttonLabelB)
+        .setStyle(ButtonStyle.Danger)
     );
-    await message.reply({ embeds: [embed] });
+
+    await message.reply({ embeds: [embed], components: [row] });
   },
 
   // ─── matches ───
@@ -112,13 +134,13 @@ const bettingCommands = {
     }
 
     const entries = matches.map((m) => {
-      const oddsText = m.odds_a && m.odds_b ? ` *(${m.odds_a}x vs ${m.odds_b}x)*` : '';
-      return `**#${m.id}** — 🟦 **${m.player_a}** vs 🟥 **${m.player_b}**${oddsText}`;
+      const oddsText = m.odds_a && m.odds_b ? `\n🟩 **${m.odds_a}x** (1)  |  🟥 **${m.odds_b}x** (2)` : '';
+      return `**Match #${m.id}**\n🏴󠁧󠁢󠁥󠁮󠁧󠁿 **${m.player_a}** vs 🇳🇿 **${m.player_b}**${oddsText}\n───────────────────`;
     });
 
     const embed = embeds.betting(
       `🎲 Open Matches (Page ${page}/${totalPages})`,
-      entries.join('\n') + '\n\nUse `mochi matchinfo <id>` for details.\n*Use `mochi matches <page>` to view other pages.*'
+      entries.join('\n') + '\nUse `mochi matchinfo <id>` for details.'
     );
     await message.reply({ embeds: [embed] });
   },
@@ -157,11 +179,15 @@ const bettingCommands = {
     const totalB = betsOnB.reduce((sum, b) => sum + b.amount, 0);
     const totalPool = totalA + totalB;
 
-    const oddsInfo = match.odds_a && match.odds_b ? `\n📈 Odds: **${match.odds_a}x** vs **${match.odds_b}x**` : '';
-    const embed = embeds.betting(
-      `📊 Match #${match.id} Info`,
-      `🟦 **${match.player_a}** vs 🟥 **${match.player_b}**\nStatus: **${match.status.toUpperCase()}**${oddsInfo}${match.winner ? `\nWinner: **${match.winner}**` : ''}`
-    );
+    const embed = new (require('discord.js').EmbedBuilder)()
+      .setColor(0x00FF00)
+      .setTitle(`📊 Match #${match.id} Info`)
+      .setDescription('National teams. Test match. 2nd Test')
+      .addFields(
+        { name: `🏴󠁧󠁢󠁥󠁮󠁧󠁿 ${match.player_a}`, value: `Bets: **${betsOnA.length}**\nTotal: **${totalA.toLocaleString()}** coins\nOdds: **${match.odds_a ? match.odds_a + 'x' : 'Dynamic'}**`, inline: true },
+        { name: `🇳🇿 ${match.player_b}`, value: `Bets: **${betsOnB.length}**\nTotal: **${totalB.toLocaleString()}** coins\nOdds: **${match.odds_b ? match.odds_b + 'x' : 'Dynamic'}**`, inline: true },
+        { name: '💰 Total Pool', value: `**${totalPool.toLocaleString()}** coins`, inline: true }
+      );
 
     embed.addFields(
       { name: `🟦 ${match.player_a}`, value: `Bets: **${betsOnA.length}**\nTotal: **${totalA.toLocaleString()}** coins`, inline: true },

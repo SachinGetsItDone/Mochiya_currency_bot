@@ -101,6 +101,117 @@ client.on('messageCreate', async (message) => {
   }
 });
 
+// ─── Event: Interaction Create (Buttons & Modals) ───
+client.on('interactionCreate', async (interaction) => {
+  if (interaction.isButton()) {
+    const customId = interaction.customId;
+    if (customId.startsWith('bet_a_') || customId.startsWith('bet_b_')) {
+      const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
+      const isPlayerA = customId.startsWith('bet_a_');
+      const matchId = customId.split('_')[2];
+
+      const modal = new ModalBuilder()
+        .setCustomId(`bet_modal_${isPlayerA ? 'a' : 'b'}_${matchId}`)
+        .setTitle('Place Match Bet 🎲');
+
+      const amountInput = new TextInputBuilder()
+        .setCustomId('bet_amount')
+        .setLabel('How much coins do you want to bet?')
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder('Enter coin amount (e.g. 500)')
+        .setRequired(true);
+
+      const actionRow = new ActionRowBuilder().addComponents(amountInput);
+      modal.addComponents(actionRow);
+
+      await interaction.showModal(modal);
+    }
+    return;
+  }
+
+  if (interaction.isModalSubmit()) {
+    const customId = interaction.customId;
+    if (customId.startsWith('bet_modal_')) {
+      await interaction.deferReply({ ephemeral: true });
+      const parts = customId.split('_');
+      const playerLetter = parts[2];
+      const matchId = parseInt(parts[3]);
+      const amountStr = interaction.fields.getTextInputValue('bet_amount');
+      const amount = parseInt(amountStr);
+
+      if (isNaN(amount) || amount <= 0) {
+        await interaction.followUp({ content: '❌ Please enter a valid positive number for your bet.', ephemeral: true });
+        return;
+      }
+
+      const guildId = interaction.guild.id;
+
+      // Fetch match
+      const { data: match, error } = await supabase
+        .from('matches')
+        .select('*')
+        .eq('id', matchId)
+        .eq('guild_id', guildId)
+        .eq('status', 'open')
+        .single();
+
+      if (error || !match) {
+        await interaction.followUp({ content: '❌ This match is no longer open for betting.', ephemeral: true });
+        return;
+      }
+
+      const playerName = playerLetter === 'a' ? match.player_a : match.player_b;
+
+      // Check if user already placed a bet on this match
+      const { data: existingBet } = await supabase
+        .from('match_bets')
+        .select('id')
+        .eq('match_id', match.id)
+        .eq('user_id', interaction.user.id)
+        .single();
+
+      if (existingBet) {
+        await interaction.followUp({ content: '❌ You have already placed a bet on this match. Only one bet is allowed.', ephemeral: true });
+        return;
+      }
+
+      // Check balance
+      const balance = await getBalance(interaction.user.id, guildId);
+      if (balance < amount) {
+        await interaction.followUp({ content: `❌ Insufficient funds. You only have **${balance.toLocaleString()}** Mochi Coins.`, ephemeral: true });
+        return;
+      }
+
+      // Deduct coins & record bet
+      try {
+        await debit(interaction.user.id, guildId, amount, 'match_bet', `Bet on ${playerName} in Match #${match.id}`);
+        const { error: betError } = await supabase
+          .from('match_bets')
+          .insert({
+            match_id: match.id,
+            guild_id: guildId,
+            user_id: interaction.user.id,
+            supported: playerName,
+            amount: amount,
+          });
+
+        if (betError) {
+          await credit(interaction.user.id, guildId, amount, 'bet_refund', `Refund for failed bet on Match #${match.id}`);
+          throw betError;
+        }
+
+        await interaction.followUp({ content: `✅ Bet placed successfully! You bet **${amount.toLocaleString()}** coins on **${playerName}**! 🍀`, ephemeral: true });
+        
+        // Optionally send a public notification in the channel
+        await interaction.channel.send(`🎲 **${interaction.user.username}** placed a bet of **${amount.toLocaleString()}** coins on **${playerName}**!`);
+      } catch (err) {
+        console.error(err);
+        await interaction.followUp({ content: '❌ Something went wrong while placing your bet.', ephemeral: true });
+      }
+    }
+  }
+});
+
 // ─── Help Command with Interactive Dropdown ───
 async function sendHelp(message) {
   const { ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js');
