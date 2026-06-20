@@ -13,7 +13,6 @@ const CHAMBERS = 6;
 const ASSETS_DIR = path.join(__dirname, '../assets/roulette');
 const CLICK_GIF = path.join(ASSETS_DIR, 'click.gif');
 const CHALLENGE_GIF = path.join(ASSETS_DIR, 'challenge.gif');
-const TURN_GIF = path.join(ASSETS_DIR, 'turn.gif');
 const START_GIF = path.join(ASSETS_DIR, 'start.gif');
 
 // Distinct shot outcome GIFs
@@ -55,7 +54,6 @@ function buildTurnEmbed(activePlayer, otherPlayer, chamberPosition, totalChamber
   const filled = Math.min(Math.floor(probability / 5), 20);
   const tensionBar = '█'.repeat(filled) + '░'.repeat(20 - filled);
 
-  const file = new AttachmentBuilder(TURN_GIF, { name: 'turn.gif' });
   const embed = new EmbedBuilder()
     .setColor(chamberPosition >= 3 ? 0xFF0000 : embeds.COLORS.roulette)
     .setTitle(`🩸 ${activePlayer.username}'s Turn`)
@@ -70,11 +68,10 @@ function buildTurnEmbed(activePlayer, otherPlayer, chamberPosition, totalChamber
       `⏳ *30 seconds before auto-forfeit*`
     )
     .setThumbnail(activePlayer.displayAvatarURL({ dynamic: true }))
-    .setImage('attachment://turn.gif')
     .setFooter({ text: `💰 ${(wager * 2).toLocaleString()} coins on the line` })
     .setTimestamp();
 
-  return { embed, file };
+  return { embed };
 }
 
 // ─── Helper: Build the CLICK (survived) embed ───
@@ -158,7 +155,7 @@ async function playRoulette(message, challenger, opponent, wager, guildId, gameM
     const otherPlayer = players[(turnIndex + 1) % 2];
 
     // Build turn embed with action buttons
-    const { embed: turnEmbed, file: turnFile } = buildTurnEmbed(activePlayer, otherPlayer, currentChamber, CHAMBERS, wager);
+    const { embed: turnEmbed } = buildTurnEmbed(activePlayer, otherPlayer, currentChamber, CHAMBERS, wager);
     const pullButtons = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId(`rr_self_${gameId}_${currentChamber}`)
@@ -170,7 +167,7 @@ async function playRoulette(message, challenger, opponent, wager, guildId, gameM
         .setStyle(ButtonStyle.Danger)
     );
 
-    await gameMessage.edit({ embeds: [turnEmbed], components: [pullButtons], files: [turnFile] });
+    await gameMessage.edit({ embeds: [turnEmbed], components: [pullButtons], files: [] });
 
     // Wait for the active player to click
     try {
