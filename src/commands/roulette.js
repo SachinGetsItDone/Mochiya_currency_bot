@@ -11,7 +11,7 @@ const CHAMBERS = 6;
 
 // Local GIF paths
 const ASSETS_DIR = path.join(__dirname, '../assets/roulette');
-const CLICK_GIF = path.join(ASSETS_DIR, 'click.gif');
+
 const CHALLENGE_GIF = path.join(ASSETS_DIR, 'challenge.gif');
 const START_GIF = path.join(ASSETS_DIR, 'start.gif');
 
