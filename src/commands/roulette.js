@@ -202,7 +202,7 @@ async function playRoulette(message, challenger, opponent, wager, guildId, gameM
 
         // Send victory message
         try {
-          await new Promise((resolve) => setTimeout(resolve, 6000));
+          await new Promise((resolve) => setTimeout(resolve, 5000));
           const winnerFile = new AttachmentBuilder(GIFS.winner, { name: 'winner.gif' });
           const winnerEmbed = new EmbedBuilder()
             .setColor(0x00FF00)
@@ -221,7 +221,7 @@ async function playRoulette(message, challenger, opponent, wager, guildId, gameM
         await gameMessage.edit({ embeds: [clickEmbed], components: [], files: [clickFile] });
 
         // Brief dramatic pause
-        await new Promise((resolve) => setTimeout(resolve, 6000));
+        await new Promise((resolve) => setTimeout(resolve, 5000));
 
         currentChamber++;
         turnIndex++; // Turn always passes after a blank shot
@@ -413,7 +413,7 @@ const rouletteCommands = {
       await challengeMsg.edit({ embeds: [startEmbed], components: [], files: [startFile], content: null });
 
       // Brief dramatic pause before first turn
-      await new Promise((resolve) => setTimeout(resolve, 4500));
+      await new Promise((resolve) => setTimeout(resolve, 2000));
 
       // Play the game
       try {
