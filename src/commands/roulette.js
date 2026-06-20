@@ -35,7 +35,8 @@ function buildChallengeEmbed(challenger, opponent, wager) {
 // ─── Helper: Build the turn embed ───
 function buildTurnEmbed(activePlayer, otherPlayer, chamberPosition, totalChambers, wager) {
   const probability = Math.round((1 / (totalChambers - chamberPosition)) * 100);
-  const tensionBar = '█'.repeat(Math.min(probability / 5, 20)) + '░'.repeat(Math.max(20 - Math.ceil(probability / 5), 0));
+  const filled = Math.min(Math.floor(probability / 5), 20);
+  const tensionBar = '█'.repeat(filled) + '░'.repeat(20 - filled);
 
   return new EmbedBuilder()
     .setColor(chamberPosition >= 3 ? 0xFF0000 : embeds.COLORS.roulette)
@@ -301,8 +302,29 @@ const rouletteCommands = {
         return;
       }
 
-      await debit(message.author.id, guildId, wager, 'roulette_wager', `Russian Roulette wager vs ${opponent.username}`);
-      await debit(opponent.id, guildId, wager, 'roulette_wager', `Russian Roulette wager vs ${message.author.username}`);
+      try {
+        await debit(message.author.id, guildId, wager, 'roulette_wager', `Russian Roulette wager vs ${opponent.username}`);
+      } catch (debitErr) {
+        activeGames.delete(channelId);
+        await challengeMsg.edit({
+          embeds: [embeds.error('Insufficient Funds', `**${message.author.username}** no longer has enough coins! Match cancelled.`)],
+          components: [], content: null,
+        });
+        return;
+      }
+
+      try {
+        await debit(opponent.id, guildId, wager, 'roulette_wager', `Russian Roulette wager vs ${message.author.username}`);
+      } catch (debitErr) {
+        // Refund the challenger since opponent's debit failed
+        await credit(message.author.id, guildId, wager, 'roulette_refund', `Refund — opponent couldn't match wager`);
+        activeGames.delete(channelId);
+        await challengeMsg.edit({
+          embeds: [embeds.error('Insufficient Funds', `**${opponent.username}** no longer has enough coins! Match cancelled. ${message.author.username} has been refunded.`)],
+          components: [], content: null,
+        });
+        return;
+      }
 
       // Update game state
       activeGames.set(channelId, { status: 'playing', challenger: message.author.id, opponent: opponent.id });
@@ -326,7 +348,25 @@ const rouletteCommands = {
       await new Promise((resolve) => setTimeout(resolve, 2000));
 
       // Play the game
-      await playRoulette(message, message.author, opponent, wager, guildId, challengeMsg);
+      try {
+        await playRoulette(message, message.author, opponent, wager, guildId, challengeMsg);
+      } catch (gameErr) {
+        console.error('❌ Russian Roulette game error:', gameErr);
+        activeGames.delete(channelId);
+        // Refund both players on unexpected crash
+        try {
+          await credit(message.author.id, guildId, wager, 'roulette_refund', 'Refund — game crashed');
+          await credit(opponent.id, guildId, wager, 'roulette_refund', 'Refund — game crashed');
+        } catch (refundErr) {
+          console.error('❌ Failed to refund after game crash:', refundErr);
+        }
+        try {
+          await challengeMsg.edit({
+            embeds: [embeds.error('Game Error', 'Something went wrong during the game! Both players have been refunded.')],
+            components: [],
+          });
+        } catch {}
+      }
 
     } catch (err) {
       // Challenge timed out
