@@ -11,6 +11,9 @@ const CHAMBERS = 6;
 // Gunshot GIF URLs
 const BANG_GIF = 'https://media1.tenor.com/m/M0s5-KxIMEoAAAAd/gunshot.gif';
 const CLICK_GIF = 'https://media1.tenor.com/m/e_chqW5eReEAAAAd/revolver-spin.gif';
+const CHALLENGE_GIF = 'https://media.tenor.com/cRz9UPHxuegAAAAC/gun-bullets.gif';
+const TURN_GIF = 'https://media.tenor.com/lyovtFp0FksAAAAC/shane-gun-spinning.gif';
+const START_GIF = 'https://media.tenor.com/fklGVnlUSFQAAAAC/russian-roulette.gif';
 
 // In-memory active games (channelId → game state)
 const activeGames = new Map();
@@ -28,6 +31,7 @@ function buildChallengeEmbed(challenger, opponent, wager) {
       `⏳ ${opponent.username}, you have **60 seconds** to respond!`
     )
     .setThumbnail(challenger.displayAvatarURL({ dynamic: true }))
+    .setImage(CHALLENGE_GIF)
     .setFooter({ text: '🍡 Mochi Bot — Russian Roulette' })
     .setTimestamp();
 }
@@ -50,6 +54,7 @@ function buildTurnEmbed(activePlayer, otherPlayer, chamberPosition, totalChamber
       `⏳ *30 seconds before auto-forfeit*`
     )
     .setThumbnail(activePlayer.displayAvatarURL({ dynamic: true }))
+    .setImage(TURN_GIF)
     .setFooter({ text: `💰 ${(wager * 2).toLocaleString()} coins on the line` })
     .setTimestamp();
 }
@@ -339,6 +344,7 @@ const rouletteCommands = {
           `*Someone isn't making it out alive.* 💀\n\n` +
           `**Prize Pool: ${(wager * 2).toLocaleString()} Mochi Coins**`
         )
+        .setImage(START_GIF)
         .setFooter({ text: '🍡 Mochi Bot — Russian Roulette' })
         .setTimestamp();
 
