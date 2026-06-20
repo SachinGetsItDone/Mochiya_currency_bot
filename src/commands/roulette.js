@@ -18,14 +18,10 @@ const START_GIF = path.join(ASSETS_DIR, 'start.gif');
 
 // Distinct shot outcome GIFs
 const GIFS = {
-  player_shoot_self_empty: path.join(ASSETS_DIR, 'player_shoot_self_empty.gif'),
-  player_shoot_self_bang: path.join(ASSETS_DIR, 'player_shoot_self_bang.gif'),
-  player_shoot_dealer_empty: path.join(ASSETS_DIR, 'player_shoot_dealer_empty.gif'),
-  player_shoot_dealer_bang: path.join(ASSETS_DIR, 'player_shoot_dealer_bang.gif'),
-  dealer_shoot_self_empty: path.join(ASSETS_DIR, 'dealer_shoot_self_empty.gif'),
-  dealer_shoot_self_bang: path.join(ASSETS_DIR, 'dealer_shoot_self_bang.gif'),
-  dealer_shoot_player_empty: path.join(ASSETS_DIR, 'dealer_shoot_player_empty.gif'),
-  dealer_shoot_player_bang: path.join(ASSETS_DIR, 'dealer_shoot_player_bang.gif'),
+  self_empty: path.join(ASSETS_DIR, 'self_empty.gif'),
+  self_bang: path.join(ASSETS_DIR, 'self_bang.gif'),
+  enemy_empty: path.join(ASSETS_DIR, 'enemy_empty.gif'),
+  enemy_bang: path.join(ASSETS_DIR, 'enemy_bang.gif'),
   winner: path.join(ASSETS_DIR, 'winner.gif'),
 };
 
@@ -77,26 +73,18 @@ function buildTurnEmbed(activePlayer, otherPlayer, chamberPosition, totalChamber
     .setImage('attachment://turn.gif')
     .setFooter({ text: `💰 ${(wager * 2).toLocaleString()} coins on the line` })
     .setTimestamp();
-    
+
   return { embed, file };
 }
 
 // ─── Helper: Build the CLICK (survived) embed ───
-function buildClickEmbed(player, target, chamberPosition, totalChambers, challenger) {
+function buildClickEmbed(player, target, chamberPosition, totalChambers) {
   const isSelf = player.id === target.id;
-  const isPlayer = player.id === challenger.id; // Is the active player the Challenger?
   const targetName = isSelf ? 'themselves' : `**${target.username}**`;
   const reaction = isSelf ? 'sweats nervously as the shotgun clicks empty... The shotgun is passed over.' : 'clicks empty! The shotgun is passed over...';
 
-  let gifKey = '';
-  if (isPlayer) {
-    gifKey = isSelf ? 'player_shoot_self_empty' : 'player_shoot_dealer_empty';
-  } else {
-    gifKey = isSelf ? 'dealer_shoot_self_empty' : 'dealer_shoot_player_empty';
-  }
-  
-  const gifPath = GIFS[gifKey];
-  const gifName = `${gifKey}.gif`;
+  const gifPath = isSelf ? GIFS.self_empty : GIFS.enemy_empty;
+  const gifName = isSelf ? 'self_empty.gif' : 'enemy_empty.gif';
   const file = new AttachmentBuilder(gifPath, { name: gifName });
 
   const embed = new EmbedBuilder()
@@ -115,20 +103,12 @@ function buildClickEmbed(player, target, chamberPosition, totalChambers, challen
 }
 
 // ─── Helper: Build the BANG (eliminated) embed ───
-function buildBangEmbed(shooter, target, winner, loser, wager, challenger) {
+function buildBangEmbed(shooter, target, winner, loser, wager) {
   const isSelf = shooter.id === target.id;
-  const isPlayer = shooter.id === challenger.id;
   const targetName = isSelf ? 'themselves' : `**${target.username}**`;
 
-  let gifKey = '';
-  if (isPlayer) {
-    gifKey = isSelf ? 'player_shoot_self_bang' : 'player_shoot_dealer_bang';
-  } else {
-    gifKey = isSelf ? 'dealer_shoot_self_bang' : 'dealer_shoot_player_bang';
-  }
-
-  const gifPath = GIFS[gifKey];
-  const gifName = `${gifKey}.gif`;
+  const gifPath = isSelf ? GIFS.self_bang : GIFS.enemy_bang;
+  const gifName = isSelf ? 'self_bang.gif' : 'enemy_bang.gif';
   const file = new AttachmentBuilder(gifPath, { name: gifName });
 
   const embed = new EmbedBuilder()
@@ -144,7 +124,7 @@ function buildBangEmbed(shooter, target, winner, loser, wager, challenger) {
     .setImage(`attachment://${gifName}`)
     .setFooter({ text: '🍡 Mochi Bot — Buckshot Roulette' })
     .setTimestamp();
-    
+
   return { embed, file };
 }
 
@@ -217,27 +197,17 @@ async function playRoulette(message, challenger, opponent, wager, guildId, gameM
       // Check if this chamber has the bullet
       if (currentChamber === bulletPosition) {
         // BANG! 💥
-        const { embed: bangEmbed, file: bangFile } = buildBangEmbed(activePlayer, target, winner, loser, wager, challenger);
+        const { embed: bangEmbed, file: bangFile } = buildBangEmbed(activePlayer, target, winner, loser, wager);
         await gameMessage.edit({ embeds: [bangEmbed], components: [], files: [bangFile] });
 
         // Payout to the winner
         await credit(winner.id, guildId, wager * 2, 'roulette_win', `Won Buckshot Roulette vs ${loser.username} (${(wager * 2).toLocaleString()} coins)`);
 
-        // Send victory message
-        await new Promise((resolve) => setTimeout(resolve, 2500));
-        const winnerFile = new AttachmentBuilder(GIFS.winner, { name: 'winner.gif' });
-        const winnerEmbed = new EmbedBuilder()
-          .setColor(0x00FF00)
-          .setTitle('🎉 VICTORY! 🎉')
-          .setDescription(`**${winner.username}** takes home **${(wager * 2).toLocaleString()}** Mochi Coins!`)
-          .setImage('attachment://winner.gif');
-        await gameMessage.reply({ embeds: [winnerEmbed], files: [winnerFile] });
-
         activeGames.delete(gameId);
         return;
       } else {
         // Click... survived (Blank)
-        const { embed: clickEmbed, file: clickFile } = buildClickEmbed(activePlayer, target, currentChamber, CHAMBERS, challenger);
+        const { embed: clickEmbed, file: clickFile } = buildClickEmbed(activePlayer, target, currentChamber, CHAMBERS);
         await gameMessage.edit({ embeds: [clickEmbed], components: [], files: [clickFile] });
 
         // Brief dramatic pause
@@ -441,7 +411,7 @@ const rouletteCommands = {
             embeds: [embeds.error('Game Error', 'Something went wrong during the game! Both players have been refunded.')],
             components: [],
           });
-        } catch {}
+        } catch { }
       }
 
     } catch (err) {
