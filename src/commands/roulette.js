@@ -200,7 +200,23 @@ async function playRoulette(message, challenger, opponent, wager, guildId, gameM
         // Payout to the winner
         await credit(winner.id, guildId, wager * 2, 'roulette_win', `Won Buckshot Roulette vs ${loser.username} (${(wager * 2).toLocaleString()} coins)`);
 
+        // Safely end game in state before sending secondary messages
         activeGames.delete(gameId);
+
+        // Send victory message
+        try {
+          await new Promise((resolve) => setTimeout(resolve, 2500));
+          const winnerFile = new AttachmentBuilder(GIFS.winner, { name: 'winner.gif' });
+          const winnerEmbed = new EmbedBuilder()
+            .setColor(0x00FF00)
+            .setTitle('🎉 VICTORY! 🎉')
+            .setDescription(`**${winner.username}** takes home **${(wager * 2).toLocaleString()}** Mochi Coins!`)
+            .setImage('attachment://winner.gif');
+          await gameMessage.reply({ embeds: [winnerEmbed], files: [winnerFile] });
+        } catch (e) {
+          console.error('Failed to send winner message:', e);
+        }
+
         return;
       } else {
         // Click... survived (Blank)
@@ -215,8 +231,12 @@ async function playRoulette(message, challenger, opponent, wager, guildId, gameM
       }
     } catch (err) {
       // Timeout — active player forfeits
-      const forfeitEmbed = buildForfeitEmbed(activePlayer, otherPlayer, wager);
-      await gameMessage.edit({ embeds: [forfeitEmbed], components: [] });
+      try {
+        const forfeitEmbed = buildForfeitEmbed(activePlayer, otherPlayer, wager);
+        await gameMessage.edit({ embeds: [forfeitEmbed], components: [] });
+      } catch (editErr) {
+        console.error('Failed to edit forfeit message:', editErr);
+      }
 
       // Payout to the winner
       await credit(otherPlayer.id, guildId, wager * 2, 'roulette_win', `Won Buckshot Roulette by forfeit vs ${activePlayer.username}`);
