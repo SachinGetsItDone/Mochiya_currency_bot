@@ -11,13 +11,16 @@ const CHAMBERS = 6;
 
 // Local GIF paths
 const ASSETS_DIR = path.join(__dirname, '../assets/roulette');
-const BANG_GIF = path.join(ASSETS_DIR, 'bang.gif');
 const CLICK_GIF = path.join(ASSETS_DIR, 'click.gif');
 const CHALLENGE_GIF = path.join(ASSETS_DIR, 'challenge.gif');
 const TURN_GIF = path.join(ASSETS_DIR, 'turn.gif');
 const START_GIF = path.join(ASSETS_DIR, 'start.gif');
-const SELF_GIF = path.join(ASSETS_DIR, 'self.gif');
-const ENEMY_GIF = path.join(ASSETS_DIR, 'enemy.gif');
+
+// Distinct shot outcome GIFs
+const SELF_BANG_GIF = path.join(ASSETS_DIR, 'self_bang.gif');
+const ENEMY_BANG_GIF = path.join(ASSETS_DIR, 'enemy_bang.gif');
+const SELF_EMPTY_GIF = path.join(ASSETS_DIR, 'self_empty.gif');
+const ENEMY_EMPTY_GIF = path.join(ASSETS_DIR, 'enemy_empty.gif');
 
 // In-memory active games (channelId → game state)
 const activeGames = new Map();
@@ -77,8 +80,8 @@ function buildClickEmbed(player, target, chamberPosition, totalChambers) {
   const targetName = isSelf ? 'themselves' : `**${target.username}**`;
   const reaction = isSelf ? 'sweats nervously as the shotgun clicks empty... The shotgun is passed over.' : 'clicks empty! The shotgun is passed over...';
 
-  const gifPath = isSelf ? SELF_GIF : ENEMY_GIF;
-  const gifName = isSelf ? 'self.gif' : 'enemy.gif';
+  const gifPath = isSelf ? SELF_EMPTY_GIF : ENEMY_EMPTY_GIF;
+  const gifName = isSelf ? 'self_empty.gif' : 'enemy_empty.gif';
   const file = new AttachmentBuilder(gifPath, { name: gifName });
 
   const embed = new EmbedBuilder()
@@ -101,7 +104,10 @@ function buildBangEmbed(shooter, target, winner, loser, wager) {
   const isSelf = shooter.id === target.id;
   const targetName = isSelf ? 'themselves' : `**${target.username}**`;
 
-  const file = new AttachmentBuilder(BANG_GIF, { name: 'bang.gif' });
+  const gifPath = isSelf ? SELF_BANG_GIF : ENEMY_BANG_GIF;
+  const gifName = isSelf ? 'self_bang.gif' : 'enemy_bang.gif';
+  const file = new AttachmentBuilder(gifPath, { name: gifName });
+
   const embed = new EmbedBuilder()
     .setColor(0xFF0000)
     .setTitle('💥 BANG!!! 💀')
@@ -112,7 +118,7 @@ function buildBangEmbed(shooter, target, winner, loser, wager) {
       `💰 **${winner.username}** survives and wins **${(wager * 2).toLocaleString()}** Mochi Coins! 🎉\n` +
       `💸 **${loser.username}** lost **${wager.toLocaleString()}** Mochi Coins.`
     )
-    .setImage('attachment://bang.gif')
+    .setImage(`attachment://${gifName}`)
     .setFooter({ text: '🍡 Mochi Bot — Buckshot Roulette' })
     .setTimestamp();
     
