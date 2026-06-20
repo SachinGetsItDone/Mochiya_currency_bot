@@ -14,6 +14,8 @@ const CLICK_GIF = 'https://media1.tenor.com/m/e_chqW5eReEAAAAd/revolver-spin.gif
 const CHALLENGE_GIF = 'https://media.tenor.com/cRz9UPHxuegAAAAC/gun-bullets.gif';
 const TURN_GIF = 'https://media.tenor.com/lyovtFp0FksAAAAC/shane-gun-spinning.gif';
 const START_GIF = 'https://media.tenor.com/fklGVnlUSFQAAAAC/russian-roulette.gif';
+const SELF_GIF = 'https://media.tenor.com/C-6mfrI6L9EAAAAC/anime-gun.gif';
+const ENEMY_GIF = 'https://media.tenor.com/KQUPSfCb_2kAAAAC/suzaku-kururugi.gif';
 
 // In-memory active games (channelId → game state)
 const activeGames = new Map();
@@ -50,7 +52,9 @@ function buildTurnEmbed(activePlayer, otherPlayer, chamberPosition, totalChamber
       `🎯 **Chamber ${chamberPosition + 1} of ${totalChambers}**\n` +
       `💀 Death Chance: **${probability}%**\n` +
       `\`${tensionBar}\` \n\n` +
-      `**${activePlayer.username}**, pull the trigger... if you dare.\n\n` +
+      `**${activePlayer.username}**, who do you aim at?\n\n` +
+      `🔫 **Shoot Self:** Blank = Pass Turn | Bullet = Lose\n` +
+      `🎯 **Shoot Enemy:** Blank = Pass Turn | Bullet = Win\n\n` +
       `⏳ *30 seconds before auto-forfeit*`
     )
     .setThumbnail(activePlayer.displayAvatarURL({ dynamic: true }))
@@ -60,39 +64,37 @@ function buildTurnEmbed(activePlayer, otherPlayer, chamberPosition, totalChamber
 }
 
 // ─── Helper: Build the CLICK (survived) embed ───
-function buildClickEmbed(player, chamberPosition, totalChambers) {
-  const reactions = [
-    'sweat drips down their face... but they live another round.',
-    'hands trembling... but the chamber was empty!',
-    'exhales sharply... the click echoes in the silence.',
-    'heart pounds... but fate spares them. For now.',
-    'flinches... *click*. Empty. Pure luck.',
-  ];
-  const reaction = reactions[Math.floor(Math.random() * reactions.length)];
+function buildClickEmbed(player, target, chamberPosition, totalChambers) {
+  const isSelf = player.id === target.id;
+  const targetName = isSelf ? 'themselves' : `**${target.username}**`;
+  const reaction = isSelf ? 'sweats nervously as the chamber clicks empty... The gun is passed over.' : 'clicks empty! The gun is passed over...';
 
   return new EmbedBuilder()
     .setColor(0x2ECC71)
-    .setTitle('*click...* 😰')
+    .setTitle('*click...* 💨')
     .setDescription(
-      `**${player.username}** ${reaction}\n\n` +
-      `✅ **Survived!** Chamber ${chamberPosition + 1}/${totalChambers} was empty.\n` +
-      `The revolver passes to the next player...`
+      `**${player.username}** aimed at ${targetName} and pulled the trigger...\n\n` +
+      `✅ **BLANK!** Chamber ${chamberPosition + 1}/${totalChambers} was empty.\n\n` +
+      `**${player.username}** ${reaction}`
     )
-    .setImage(CLICK_GIF)
+    .setImage(isSelf ? SELF_GIF : ENEMY_GIF)
     .setFooter({ text: '🍡 Mochi Bot — Russian Roulette' })
     .setTimestamp();
 }
 
 // ─── Helper: Build the BANG (eliminated) embed ───
-function buildBangEmbed(loser, winner, wager) {
+function buildBangEmbed(shooter, target, winner, loser, wager) {
+  const isSelf = shooter.id === target.id;
+  const targetName = isSelf ? 'themselves' : `**${target.username}**`;
+
   return new EmbedBuilder()
     .setColor(0xFF0000)
     .setTitle('💥 BANG!!! 💀')
     .setDescription(
-      `**${loser.username}** pulled the trigger and...\n\n` +
+      `**${shooter.username}** aimed at ${targetName} and pulled the trigger...\n\n` +
       `# 💀 SHOT! 💀\n\n` +
-      `**${winner.username}** survives and takes the pot!\n\n` +
-      `💰 **${winner.username}** wins **${(wager * 2).toLocaleString()}** Mochi Coins! 🎉\n` +
+      `**${loser.username}** goes down!\n\n` +
+      `💰 **${winner.username}** survives and wins **${(wager * 2).toLocaleString()}** Mochi Coins! 🎉\n` +
       `💸 **${loser.username}** lost **${wager.toLocaleString()}** Mochi Coins.`
     )
     .setImage(BANG_GIF)
@@ -129,16 +131,20 @@ async function playRoulette(message, challenger, opponent, wager, guildId, gameM
     const activePlayer = players[turnIndex % 2];
     const otherPlayer = players[(turnIndex + 1) % 2];
 
-    // Build turn embed with "Pull Trigger" button
+    // Build turn embed with action buttons
     const turnEmbed = buildTurnEmbed(activePlayer, otherPlayer, currentChamber, CHAMBERS, wager);
-    const pullButton = new ActionRowBuilder().addComponents(
+    const pullButtons = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
-        .setCustomId(`rr_pull_${gameId}_${currentChamber}`)
-        .setLabel('🔫 Pull the Trigger')
+        .setCustomId(`rr_self_${gameId}_${currentChamber}`)
+        .setLabel('🔫 Shoot Self')
+        .setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder()
+        .setCustomId(`rr_enemy_${gameId}_${currentChamber}`)
+        .setLabel('🎯 Shoot Enemy')
         .setStyle(ButtonStyle.Danger)
     );
 
-    await gameMessage.edit({ embeds: [turnEmbed], components: [pullButton] });
+    await gameMessage.edit({ embeds: [turnEmbed], components: [pullButtons] });
 
     // Wait for the active player to click
     try {
@@ -156,27 +162,33 @@ async function playRoulette(message, challenger, opponent, wager, guildId, gameM
 
       await btnInteraction.deferUpdate();
 
+      const action = btnInteraction.customId.split('_')[1]; // 'self' or 'enemy'
+      const isSelf = action === 'self';
+      const target = isSelf ? activePlayer : otherPlayer;
+      const winner = isSelf ? otherPlayer : activePlayer;
+      const loser = isSelf ? activePlayer : otherPlayer;
+
       // Check if this chamber has the bullet
       if (currentChamber === bulletPosition) {
         // BANG! 💥
-        const bangEmbed = buildBangEmbed(activePlayer, otherPlayer, wager);
+        const bangEmbed = buildBangEmbed(activePlayer, target, winner, loser, wager);
         await gameMessage.edit({ embeds: [bangEmbed], components: [] });
 
         // Payout to the winner
-        await credit(otherPlayer.id, guildId, wager * 2, 'roulette_win', `Won Russian Roulette vs ${activePlayer.username} (${(wager * 2).toLocaleString()} coins)`);
+        await credit(winner.id, guildId, wager * 2, 'roulette_win', `Won Russian Roulette vs ${loser.username} (${(wager * 2).toLocaleString()} coins)`);
 
         activeGames.delete(gameId);
         return;
       } else {
-        // Click... survived!
-        const clickEmbed = buildClickEmbed(activePlayer, currentChamber, CHAMBERS);
+        // Click... survived (Blank)
+        const clickEmbed = buildClickEmbed(activePlayer, target, currentChamber, CHAMBERS);
         await gameMessage.edit({ embeds: [clickEmbed], components: [] });
 
         // Brief dramatic pause
-        await new Promise((resolve) => setTimeout(resolve, 2500));
+        await new Promise((resolve) => setTimeout(resolve, 3500));
 
         currentChamber++;
-        turnIndex++;
+        turnIndex++; // Turn always passes after a blank shot
       }
     } catch (err) {
       // Timeout — active player forfeits
