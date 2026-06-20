@@ -9,6 +9,7 @@ const COLORS = {
   gold: 0xF1C40F,       // Gold/Yellow for economy
   epic: 0x9B59B6,       // Amethyst purple
   legendary: 0xE67E22,  // Orange
+  roulette: 0x8B0000,   // Dark crimson (Russian Roulette)
 };
 
 function baseEmbed(user = null) {
@@ -90,6 +91,13 @@ function betting(title, description, user = null) {
     .setDescription(description);
 }
 
+function roulette(title, description, user = null) {
+  return baseEmbed(user)
+    .setColor(COLORS.roulette)
+    .setTitle(`🔫 ${title}`)
+    .setDescription(description);
+}
+
 function getRarityColor(rarity) {
   switch (rarity?.toLowerCase()) {
     case 'common': return 0x95A5A6;
@@ -111,5 +119,6 @@ module.exports = {
   collection,
   tournament,
   betting,
+  roulette,
   getRarityColor,
 };

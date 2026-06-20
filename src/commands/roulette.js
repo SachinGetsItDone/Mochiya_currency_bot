@@ -1,0 +1,411 @@
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
+const { getBalance, debit, credit } = require('../utils/wallet');
+const embeds = require('../utils/embeds');
+
+// ─── Constants ───
+const MIN_WAGER = 50;
+const CHALLENGE_TIMEOUT_MS = 60_000;  // 60 seconds to accept/decline
+const TURN_TIMEOUT_MS = 30_000;       // 30 seconds per turn
+const CHAMBERS = 6;
+
+// Gunshot GIF URLs
+const BANG_GIF = 'https://media1.tenor.com/m/M0s5-KxIMEoAAAAd/gunshot.gif';
+const CLICK_GIF = 'https://media1.tenor.com/m/e_chqW5eReEAAAAd/revolver-spin.gif';
+
+// In-memory active games (channelId → game state)
+const activeGames = new Map();
+
+// ─── Helper: Build the challenge embed ───
+function buildChallengeEmbed(challenger, opponent, wager) {
+  return new EmbedBuilder()
+    .setColor(embeds.COLORS.roulette)
+    .setTitle('🔫 Russian Roulette — Face Off!')
+    .setDescription(
+      `**${challenger.username}** has challenged **${opponent.username}** to a deadly game of Russian Roulette!\n\n` +
+      `💰 **Wager:** ${wager.toLocaleString()} Mochi Coins each\n` +
+      `🏆 **Prize Pool:** ${(wager * 2).toLocaleString()} Mochi Coins\n\n` +
+      `*A 6-chamber revolver. One bullet. Take turns pulling the trigger.*\n*The survivor takes it all.*\n\n` +
+      `⏳ ${opponent.username}, you have **60 seconds** to respond!`
+    )
+    .setThumbnail(challenger.displayAvatarURL({ dynamic: true }))
+    .setFooter({ text: '🍡 Mochi Bot — Russian Roulette' })
+    .setTimestamp();
+}
+
+// ─── Helper: Build the turn embed ───
+function buildTurnEmbed(activePlayer, otherPlayer, chamberPosition, totalChambers, wager) {
+  const probability = Math.round((1 / (totalChambers - chamberPosition)) * 100);
+  const tensionBar = '█'.repeat(Math.min(probability / 5, 20)) + '░'.repeat(Math.max(20 - Math.ceil(probability / 5), 0));
+
+  return new EmbedBuilder()
+    .setColor(chamberPosition >= 3 ? 0xFF0000 : embeds.COLORS.roulette)
+    .setTitle(`🔫 ${activePlayer.username}'s Turn`)
+    .setDescription(
+      `The cylinder spins...\n\n` +
+      `🎯 **Chamber ${chamberPosition + 1} of ${totalChambers}**\n` +
+      `💀 Death Chance: **${probability}%**\n` +
+      `\`${tensionBar}\` \n\n` +
+      `**${activePlayer.username}**, pull the trigger... if you dare.\n\n` +
+      `⏳ *30 seconds before auto-forfeit*`
+    )
+    .setThumbnail(activePlayer.displayAvatarURL({ dynamic: true }))
+    .setFooter({ text: `💰 ${(wager * 2).toLocaleString()} coins on the line` })
+    .setTimestamp();
+}
+
+// ─── Helper: Build the CLICK (survived) embed ───
+function buildClickEmbed(player, chamberPosition, totalChambers) {
+  const reactions = [
+    'sweat drips down their face... but they live another round.',
+    'hands trembling... but the chamber was empty!',
+    'exhales sharply... the click echoes in the silence.',
+    'heart pounds... but fate spares them. For now.',
+    'flinches... *click*. Empty. Pure luck.',
+  ];
+  const reaction = reactions[Math.floor(Math.random() * reactions.length)];
+
+  return new EmbedBuilder()
+    .setColor(0x2ECC71)
+    .setTitle('*click...* 😰')
+    .setDescription(
+      `**${player.username}** ${reaction}\n\n` +
+      `✅ **Survived!** Chamber ${chamberPosition + 1}/${totalChambers} was empty.\n` +
+      `The revolver passes to the next player...`
+    )
+    .setImage(CLICK_GIF)
+    .setFooter({ text: '🍡 Mochi Bot — Russian Roulette' })
+    .setTimestamp();
+}
+
+// ─── Helper: Build the BANG (eliminated) embed ───
+function buildBangEmbed(loser, winner, wager) {
+  return new EmbedBuilder()
+    .setColor(0xFF0000)
+    .setTitle('💥 BANG!!! 💀')
+    .setDescription(
+      `**${loser.username}** pulled the trigger and...\n\n` +
+      `# 💀 SHOT! 💀\n\n` +
+      `**${winner.username}** survives and takes the pot!\n\n` +
+      `💰 **${winner.username}** wins **${(wager * 2).toLocaleString()}** Mochi Coins! 🎉\n` +
+      `💸 **${loser.username}** lost **${wager.toLocaleString()}** Mochi Coins.`
+    )
+    .setImage(BANG_GIF)
+    .setFooter({ text: '🍡 Mochi Bot — Russian Roulette' })
+    .setTimestamp();
+}
+
+// ─── Helper: Build the forfeit embed ───
+function buildForfeitEmbed(forfeiter, winner, wager, reason = 'timed out') {
+  return new EmbedBuilder()
+    .setColor(0x95A5A6)
+    .setTitle('⏰ Time\'s Up — Forfeit!')
+    .setDescription(
+      `**${forfeiter.username}** ${reason}!\n\n` +
+      `🏆 **${winner.username}** wins by default and takes **${(wager * 2).toLocaleString()}** Mochi Coins!`
+    )
+    .setFooter({ text: '🍡 Mochi Bot — Russian Roulette' })
+    .setTimestamp();
+}
+
+// ─── Main Roulette Game Logic ───
+async function playRoulette(message, challenger, opponent, wager, guildId, gameMessage) {
+  // Determine bullet position (0-indexed)
+  const bulletPosition = Math.floor(Math.random() * CHAMBERS);
+  let currentChamber = 0;
+
+  // Randomly decide who goes first
+  let players = Math.random() < 0.5 ? [challenger, opponent] : [opponent, challenger];
+  let turnIndex = 0;
+
+  const gameId = message.channel.id;
+
+  while (currentChamber < CHAMBERS) {
+    const activePlayer = players[turnIndex % 2];
+    const otherPlayer = players[(turnIndex + 1) % 2];
+
+    // Build turn embed with "Pull Trigger" button
+    const turnEmbed = buildTurnEmbed(activePlayer, otherPlayer, currentChamber, CHAMBERS, wager);
+    const pullButton = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`rr_pull_${gameId}_${currentChamber}`)
+        .setLabel('🔫 Pull the Trigger')
+        .setStyle(ButtonStyle.Danger)
+    );
+
+    await gameMessage.edit({ embeds: [turnEmbed], components: [pullButton] });
+
+    // Wait for the active player to click
+    try {
+      const btnInteraction = await gameMessage.awaitMessageComponent({
+        filter: (i) => {
+          if (i.user.id !== activePlayer.id) {
+            i.reply({ content: `❌ It's not your turn! Waiting for **${activePlayer.username}**.`, ephemeral: true });
+            return false;
+          }
+          return true;
+        },
+        componentType: ComponentType.Button,
+        time: TURN_TIMEOUT_MS,
+      });
+
+      await btnInteraction.deferUpdate();
+
+      // Check if this chamber has the bullet
+      if (currentChamber === bulletPosition) {
+        // BANG! 💥
+        const bangEmbed = buildBangEmbed(activePlayer, otherPlayer, wager);
+        await gameMessage.edit({ embeds: [bangEmbed], components: [] });
+
+        // Payout to the winner
+        await credit(otherPlayer.id, guildId, wager * 2, 'roulette_win', `Won Russian Roulette vs ${activePlayer.username} (${(wager * 2).toLocaleString()} coins)`);
+
+        activeGames.delete(gameId);
+        return;
+      } else {
+        // Click... survived!
+        const clickEmbed = buildClickEmbed(activePlayer, currentChamber, CHAMBERS);
+        await gameMessage.edit({ embeds: [clickEmbed], components: [] });
+
+        // Brief dramatic pause
+        await new Promise((resolve) => setTimeout(resolve, 2500));
+
+        currentChamber++;
+        turnIndex++;
+      }
+    } catch (err) {
+      // Timeout — active player forfeits
+      const forfeitEmbed = buildForfeitEmbed(activePlayer, otherPlayer, wager);
+      await gameMessage.edit({ embeds: [forfeitEmbed], components: [] });
+
+      // Payout to the winner
+      await credit(otherPlayer.id, guildId, wager * 2, 'roulette_win', `Won Russian Roulette by forfeit vs ${activePlayer.username}`);
+
+      activeGames.delete(gameId);
+      return;
+    }
+  }
+}
+
+// ─── Commands ───
+const rouletteCommands = {
+  // ─── roulette ───
+  async roulette(message, args, guildId) {
+    const channelId = message.channel.id;
+
+    // Check if a game is already active in this channel
+    if (activeGames.has(channelId)) {
+      await message.reply({ embeds: [embeds.error('Game in Progress', 'There\'s already a Russian Roulette game running in this channel! Wait for it to finish.')] });
+      return;
+    }
+
+    // Parse opponent
+    const opponent = message.mentions.users.first();
+    if (!opponent) {
+      await message.reply({ embeds: [embeds.error('Invalid Usage', 'Usage: `mochi roulette @user <amount>`\nChallenge someone to Russian Roulette!')] });
+      return;
+    }
+
+    if (opponent.id === message.author.id) {
+      await message.reply({ embeds: [embeds.error('Nice Try', 'You can\'t play Russian Roulette against yourself! 💀')] });
+      return;
+    }
+
+    if (opponent.bot) {
+      await message.reply({ embeds: [embeds.error('Invalid Target', 'You can\'t challenge a bot to Russian Roulette!')] });
+      return;
+    }
+
+    // Parse wager
+    const wager = parseInt(args[1]);
+    if (isNaN(wager) || wager < MIN_WAGER) {
+      await message.reply({ embeds: [embeds.error('Invalid Wager', `Minimum wager is **${MIN_WAGER}** Mochi Coins.\nUsage: \`mochi roulette @user <amount>\``)] });
+      return;
+    }
+
+    // Check balances
+    const challengerBalance = await getBalance(message.author.id, guildId);
+    if (challengerBalance < wager) {
+      await message.reply({ embeds: [embeds.error('Insufficient Funds', `You only have **${challengerBalance.toLocaleString()}** Mochi Coins. You need **${wager.toLocaleString()}** to play.`)] });
+      return;
+    }
+
+    const opponentBalance = await getBalance(opponent.id, guildId);
+    if (opponentBalance < wager) {
+      await message.reply({ embeds: [embeds.error('Opponent Broke', `**${opponent.username}** only has **${opponentBalance.toLocaleString()}** Mochi Coins. They can\'t match the wager.`)] });
+      return;
+    }
+
+    // Mark game as pending
+    activeGames.set(channelId, { status: 'pending', challenger: message.author.id, opponent: opponent.id });
+
+    // Send challenge
+    const challengeEmbed = buildChallengeEmbed(message.author, opponent, wager);
+    const challengeButtons = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`rr_accept_${channelId}`)
+        .setLabel('✅ Accept')
+        .setStyle(ButtonStyle.Success),
+      new ButtonBuilder()
+        .setCustomId(`rr_decline_${channelId}`)
+        .setLabel('❌ Decline')
+        .setStyle(ButtonStyle.Secondary)
+    );
+
+    const challengeMsg = await message.reply({
+      content: `<@${opponent.id}> — you've been challenged! 🔫`,
+      embeds: [challengeEmbed],
+      components: [challengeButtons],
+    });
+
+    // Wait for opponent response
+    try {
+      const response = await challengeMsg.awaitMessageComponent({
+        filter: (i) => {
+          if (i.user.id !== opponent.id) {
+            i.reply({ content: `❌ Only **${opponent.username}** can respond to this challenge!`, ephemeral: true });
+            return false;
+          }
+          return true;
+        },
+        componentType: ComponentType.Button,
+        time: CHALLENGE_TIMEOUT_MS,
+      });
+
+      await response.deferUpdate();
+
+      if (response.customId.startsWith('rr_decline_')) {
+        // Declined
+        activeGames.delete(channelId);
+        const declineEmbed = new EmbedBuilder()
+          .setColor(0x95A5A6)
+          .setTitle('🔫 Challenge Declined')
+          .setDescription(`**${opponent.username}** chickened out! 🐔\nThe Russian Roulette match has been cancelled.`)
+          .setFooter({ text: '🍡 Mochi Bot — Russian Roulette' })
+          .setTimestamp();
+        await challengeMsg.edit({ embeds: [declineEmbed], components: [], content: null });
+        return;
+      }
+
+      // Accepted! Deduct wagers from both players
+      // Re-check balances to prevent race conditions
+      const freshChallengerBal = await getBalance(message.author.id, guildId);
+      const freshOpponentBal = await getBalance(opponent.id, guildId);
+
+      if (freshChallengerBal < wager || freshOpponentBal < wager) {
+        activeGames.delete(channelId);
+        await challengeMsg.edit({
+          embeds: [embeds.error('Insufficient Funds', 'One of the players no longer has enough coins! Match cancelled.')],
+          components: [],
+          content: null,
+        });
+        return;
+      }
+
+      await debit(message.author.id, guildId, wager, 'roulette_wager', `Russian Roulette wager vs ${opponent.username}`);
+      await debit(opponent.id, guildId, wager, 'roulette_wager', `Russian Roulette wager vs ${message.author.username}`);
+
+      // Update game state
+      activeGames.set(channelId, { status: 'playing', challenger: message.author.id, opponent: opponent.id });
+
+      // Start the game!
+      const startEmbed = new EmbedBuilder()
+        .setColor(embeds.COLORS.roulette)
+        .setTitle('🔫 The Game Begins...')
+        .setDescription(
+          `Both players have put up **${wager.toLocaleString()}** Mochi Coins.\n\n` +
+          `*The cylinder spins... the bullet is loaded...*\n` +
+          `*Someone isn't making it out alive.* 💀\n\n` +
+          `**Prize Pool: ${(wager * 2).toLocaleString()} Mochi Coins**`
+        )
+        .setFooter({ text: '🍡 Mochi Bot — Russian Roulette' })
+        .setTimestamp();
+
+      await challengeMsg.edit({ embeds: [startEmbed], components: [], content: null });
+
+      // Brief dramatic pause before first turn
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      // Play the game
+      await playRoulette(message, message.author, opponent, wager, guildId, challengeMsg);
+
+    } catch (err) {
+      // Challenge timed out
+      activeGames.delete(channelId);
+      const timeoutEmbed = new EmbedBuilder()
+        .setColor(0x95A5A6)
+        .setTitle('⏰ Challenge Expired')
+        .setDescription(`**${opponent.username}** didn't respond in time.\nThe Russian Roulette challenge has been cancelled.`)
+        .setFooter({ text: '🍡 Mochi Bot — Russian Roulette' })
+        .setTimestamp();
+      await challengeMsg.edit({ embeds: [timeoutEmbed], components: [], content: null });
+    }
+  },
+
+  // ─── roulettestats ───
+  async roulettestats(message, args, guildId) {
+    const { supabase } = require('../utils/supabase');
+    const userId = message.author.id;
+
+    // Count wins from transactions
+    const { count: wins } = await supabase
+      .from('transactions')
+      .select('id', { count: 'exact', head: true })
+      .eq('guild_id', guildId)
+      .eq('to_user', userId)
+      .eq('type', 'roulette_win');
+
+    // Count losses from transactions (wager debits without corresponding win)
+    const { count: totalGames } = await supabase
+      .from('transactions')
+      .select('id', { count: 'exact', head: true })
+      .eq('guild_id', guildId)
+      .eq('from_user', userId)
+      .eq('type', 'roulette_wager');
+
+    const winCount = wins || 0;
+    const gameCount = totalGames || 0;
+    const lossCount = gameCount - winCount;
+    const winRate = gameCount > 0 ? Math.round((winCount / gameCount) * 100) : 0;
+
+    // Get total earnings
+    const { data: earnings } = await supabase
+      .from('transactions')
+      .select('amount')
+      .eq('guild_id', guildId)
+      .eq('to_user', userId)
+      .eq('type', 'roulette_win');
+
+    const totalEarned = earnings?.reduce((sum, t) => sum + t.amount, 0) || 0;
+
+    // Get total wagered
+    const { data: wagers } = await supabase
+      .from('transactions')
+      .select('amount')
+      .eq('guild_id', guildId)
+      .eq('from_user', userId)
+      .eq('type', 'roulette_wager');
+
+    const totalWagered = wagers?.reduce((sum, t) => sum + t.amount, 0) || 0;
+    const netProfit = totalEarned - totalWagered;
+
+    const embed = new EmbedBuilder()
+      .setColor(embeds.COLORS.roulette)
+      .setTitle(`🔫 Russian Roulette Stats`)
+      .setDescription(`Stats for **${message.author.username}**`)
+      .addFields(
+        { name: '🎮 Games Played', value: `**${gameCount}**`, inline: true },
+        { name: '🏆 Wins', value: `**${winCount}**`, inline: true },
+        { name: '💀 Deaths', value: `**${lossCount}**`, inline: true },
+        { name: '📊 Win Rate', value: `**${winRate}%**`, inline: true },
+        { name: '💰 Total Earned', value: `**${totalEarned.toLocaleString()}** coins`, inline: true },
+        { name: `${netProfit >= 0 ? '📈' : '📉'} Net Profit`, value: `**${netProfit >= 0 ? '+' : ''}${netProfit.toLocaleString()}** coins`, inline: true },
+      )
+      .setThumbnail(message.author.displayAvatarURL({ dynamic: true }))
+      .setFooter({ text: '🍡 Mochi Bot — Russian Roulette' })
+      .setTimestamp();
+
+    await message.reply({ embeds: [embed] });
+  },
+};
+
+module.exports = rouletteCommands;

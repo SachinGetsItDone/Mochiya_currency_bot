@@ -6,6 +6,7 @@ const economyCommands = require('./commands/economy');
 const tournamentCommands = require('./commands/tournament');
 const bettingCommands = require('./commands/betting');
 const shopCommands = require('./commands/shop');
+const rouletteCommands = require('./commands/roulette');
 const embeds = require('./utils/embeds');
 
 // ─── Create Discord Client ───
@@ -32,6 +33,8 @@ const allCommands = {
   ...bettingCommands,
   // Shop
   ...shopCommands,
+  // Russian Roulette
+  ...rouletteCommands,
 };
 
 // Add aliases and register
@@ -234,6 +237,7 @@ async function sendHelp(message) {
       { label: '🏅 Tournament', description: 'Budget, Players Pool, Roster', value: 'help_tournament' },
       { label: '🎲 Match Betting', description: 'Open matches, bet, match info', value: 'help_betting' },
       { label: '🛒 Season Shop', description: 'Shop, buy items, trade & gift', value: 'help_shop' },
+      { label: '🔫 Face-Off', description: 'Russian Roulette PvP game', value: 'help_roulette' },
       { label: '🔒 Admin Only', description: 'Add/remove items, set budgets, end matches', value: 'help_admin' },
     ]);
 
@@ -306,6 +310,21 @@ async function sendHelp(message) {
 • \`tradedecline \` — Decline a trade
 
 • \`tradecancel  \` — Cancel your pending trade offer
+      `.trim()),
+
+    help_roulette: new (require('discord.js').EmbedBuilder)()
+      .setColor(0x8B0000)
+      .setTitle('🔫 Face-Off — Russian Roulette')
+      .setDescription(`
+• \`roulette      \` — Challenge a player (\`roulette @user <wager>\`)
+
+• \`roulettestats \` — View your win/loss record
+
+**How it works:**
+🔫 6-chamber revolver, one bullet
+🎯 Take turns pulling the trigger
+💀 Get shot = lose your wager
+🏆 Survive = win the entire pot (2× wager)
       `.trim()),
 
     help_admin: new (require('discord.js').EmbedBuilder)()
