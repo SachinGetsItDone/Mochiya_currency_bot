@@ -5,7 +5,6 @@ const embeds = require('../utils/embeds');
 
 // ─── Constants ───
 const MIN_WAGER = 50;
-const CHALLENGE_TIMEOUT_MS = 60_000;  // 60 seconds to accept/decline
 const TURN_TIMEOUT_MS = 30_000;       // 30 seconds per turn
 const CHAMBERS = 6;
 
@@ -38,7 +37,7 @@ function buildChallengeEmbed(challenger, opponent, wager) {
       `💰 **Wager:** ${wager.toLocaleString()} Mochi Coins each\n` +
       `🏆 **Prize Pool:** ${(wager * 2).toLocaleString()} Mochi Coins\n\n` +
       `*A 12-gauge shotgun. One live shell. Take turns pulling the trigger.*\n*The survivor takes it all.*\n\n` +
-      `⏳ ${opponent.username}, you have **60 seconds** to respond!`
+      `⏳ ${opponent.username}, waiting for your response...`
     )
     .setThumbnail(challenger.displayAvatarURL({ dynamic: true }))
     .setImage('attachment://challenge.gif')
@@ -308,7 +307,7 @@ const rouletteCommands = {
         .setStyle(ButtonStyle.Success),
       new ButtonBuilder()
         .setCustomId(`rr_decline_${channelId}`)
-        .setLabel('❌ Decline')
+        .setLabel('❌ Decline / Cancel')
         .setStyle(ButtonStyle.Secondary)
     );
 
@@ -323,25 +322,33 @@ const rouletteCommands = {
     try {
       const response = await challengeMsg.awaitMessageComponent({
         filter: (i) => {
+          if (i.customId.startsWith('rr_decline_') && i.user.id === message.author.id) {
+            return true; // Challenger can cancel
+          }
           if (i.user.id !== opponent.id) {
-            i.reply({ content: `❌ Only **${opponent.username}** can respond to this challenge!`, ephemeral: true });
+            i.reply({ content: `❌ Only **${opponent.username}** can respond to this challenge! (The challenger can also cancel it).`, ephemeral: true });
             return false;
           }
           return true;
         },
         componentType: ComponentType.Button,
-        time: CHALLENGE_TIMEOUT_MS,
       });
 
       await response.deferUpdate();
 
       if (response.customId.startsWith('rr_decline_')) {
-        // Declined
+        // Declined or Cancelled
+        const isCancelling = response.user.id === message.author.id;
         activeGames.delete(channelId);
+        
         const declineEmbed = new EmbedBuilder()
           .setColor(0x95A5A6)
-          .setTitle('🔫 Challenge Declined')
-          .setDescription(`**${opponent.username}** chickened out! 🐔\nThe Buckshot Roulette match has been cancelled.`)
+          .setTitle(isCancelling ? '🔫 Challenge Cancelled' : '🔫 Challenge Declined')
+          .setDescription(
+            isCancelling 
+              ? `**${message.author.username}** cancelled their challenge.` 
+              : `**${opponent.username}** chickened out! 🐔\nThe Buckshot Roulette match has been cancelled.`
+          )
           .setFooter({ text: '🍡 Mochi Bot — Buckshot Roulette' })
           .setTimestamp();
         await challengeMsg.edit({ embeds: [declineEmbed], components: [], content: null });
@@ -432,15 +439,19 @@ const rouletteCommands = {
       }
 
     } catch (err) {
-      // Challenge timed out
+      // Message deleted or collector ended unexpectedly
       activeGames.delete(channelId);
-      const timeoutEmbed = new EmbedBuilder()
-        .setColor(0x95A5A6)
-        .setTitle('⏰ Challenge Expired')
-        .setDescription(`**${opponent.username}** didn't respond in time.\nThe Buckshot Roulette challenge has been cancelled.`)
-        .setFooter({ text: '🍡 Mochi Bot — Buckshot Roulette' })
-        .setTimestamp();
-      await challengeMsg.edit({ embeds: [timeoutEmbed], components: [], content: null });
+      try {
+        const timeoutEmbed = new EmbedBuilder()
+          .setColor(0x95A5A6)
+          .setTitle('⏰ Challenge Cancelled')
+          .setDescription(`The challenge message was removed. Match cancelled.`)
+          .setFooter({ text: '🍡 Mochi Bot — Buckshot Roulette' })
+          .setTimestamp();
+        await challengeMsg.edit({ embeds: [timeoutEmbed], components: [], content: null });
+      } catch (e) {
+        // Message is likely gone, so we can't edit it
+      }
     }
   },
 
