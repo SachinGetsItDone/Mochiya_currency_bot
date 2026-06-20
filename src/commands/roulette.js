@@ -50,8 +50,6 @@ function buildChallengeEmbed(challenger, opponent, wager) {
 // ─── Helper: Build the turn embed ───
 function buildTurnEmbed(activePlayer, otherPlayer, chamberPosition, totalChambers, wager) {
   const probability = Math.round((1 / (totalChambers - chamberPosition)) * 100);
-  const filled = Math.min(Math.floor(probability / 5), 20);
-  const tensionBar = '█'.repeat(filled) + '░'.repeat(20 - filled);
 
   const embed = new EmbedBuilder()
     .setColor(chamberPosition >= 3 ? 0xFF0000 : embeds.COLORS.roulette)
@@ -60,7 +58,7 @@ function buildTurnEmbed(activePlayer, otherPlayer, chamberPosition, totalChamber
       `The shotgun is pumped...\n\n` +
       `🎯 **Shell ${chamberPosition + 1} of ${totalChambers}**\n` +
       `💀 Death Chance: **${probability}%**\n` +
-      `\`${tensionBar}\` \n\n` +
+      `Chambers: ${'⚪'.repeat(chamberPosition)}${'🔴'.repeat(totalChambers - chamberPosition)}\n\n` +
       `**${activePlayer.username}**, who do you aim at?\n\n` +
       `🔫 **Shoot Self:** Blank = Pass Turn | Live Shell = Lose\n` +
       `🎯 **Shoot Enemy:** Blank = Pass Turn | Live Shell = Win\n\n` +
@@ -204,7 +202,7 @@ async function playRoulette(message, challenger, opponent, wager, guildId, gameM
 
         // Send victory message
         try {
-          await new Promise((resolve) => setTimeout(resolve, 2500));
+          await new Promise((resolve) => setTimeout(resolve, 6000));
           const winnerFile = new AttachmentBuilder(GIFS.winner, { name: 'winner.gif' });
           const winnerEmbed = new EmbedBuilder()
             .setColor(0x00FF00)
@@ -223,7 +221,7 @@ async function playRoulette(message, challenger, opponent, wager, guildId, gameM
         await gameMessage.edit({ embeds: [clickEmbed], components: [], files: [clickFile] });
 
         // Brief dramatic pause
-        await new Promise((resolve) => setTimeout(resolve, 3500));
+        await new Promise((resolve) => setTimeout(resolve, 6000));
 
         currentChamber++;
         turnIndex++; // Turn always passes after a blank shot
@@ -415,7 +413,7 @@ const rouletteCommands = {
       await challengeMsg.edit({ embeds: [startEmbed], components: [], files: [startFile], content: null });
 
       // Brief dramatic pause before first turn
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      await new Promise((resolve) => setTimeout(resolve, 4500));
 
       // Play the game
       try {
