@@ -33,7 +33,7 @@ const allCommands = {
   ...bettingCommands,
   // Shop
   ...shopCommands,
-  // Russian Roulette
+  // Buckshot Roulette
   ...rouletteCommands,
 };
 
@@ -237,7 +237,7 @@ async function sendHelp(message) {
       { label: '🏅 Tournament', description: 'Budget, Players Pool, Roster', value: 'help_tournament' },
       { label: '🎲 Match Betting', description: 'Open matches, bet, match info', value: 'help_betting' },
       { label: '🛒 Season Shop', description: 'Shop, buy items, trade & gift', value: 'help_shop' },
-      { label: '🔫 Face-Off', description: 'Russian Roulette PvP game', value: 'help_roulette' },
+      { label: '🔫 Face-Off', description: 'Buckshot Roulette PvP game', value: 'help_roulette' },
       { label: '🔒 Admin Only', description: 'Add/remove items, set budgets, end matches', value: 'help_admin' },
     ]);
 
@@ -314,7 +314,7 @@ async function sendHelp(message) {
 
     help_roulette: new (require('discord.js').EmbedBuilder)()
       .setColor(0x8B0000)
-      .setTitle('🔫 Face-Off — Russian Roulette')
+      .setTitle('🔫 Face-Off — Buckshot Roulette')
       .setDescription(`
 • \`roulette      \` — Challenge a player (\`roulette @user <wager>\`)
 

@@ -9,7 +9,7 @@ const COLORS = {
   gold: 0xF1C40F,       // Gold/Yellow for economy
   epic: 0x9B59B6,       // Amethyst purple
   legendary: 0xE67E22,  // Orange
-  roulette: 0x8B0000,   // Dark crimson (Russian Roulette)
+  roulette: 0x8B0000,   // Dark crimson (Buckshot Roulette)
 };
 
 function baseEmbed(user = null) {
