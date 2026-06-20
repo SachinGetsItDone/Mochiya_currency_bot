@@ -1,4 +1,5 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, AttachmentBuilder } = require('discord.js');
+const path = require('path');
 const { getBalance, debit, credit } = require('../utils/wallet');
 const embeds = require('../utils/embeds');
 
@@ -8,21 +9,23 @@ const CHALLENGE_TIMEOUT_MS = 60_000;  // 60 seconds to accept/decline
 const TURN_TIMEOUT_MS = 30_000;       // 30 seconds per turn
 const CHAMBERS = 6;
 
-// Gunshot GIF URLs
-const BANG_GIF = 'https://media1.tenor.com/m/M0s5-KxIMEoAAAAd/gunshot.gif';
-const CLICK_GIF = 'https://media1.tenor.com/m/e_chqW5eReEAAAAd/revolver-spin.gif';
-const CHALLENGE_GIF = 'https://media.tenor.com/fklGVnlUSFQAAAAC/russian-roulette.gif';
-const TURN_GIF = 'https://media.tenor.com/lyovtFp0FksAAAAC/shane-gun-spinning.gif';
-const START_GIF = 'https://media.tenor.com/cRz9UPHxuegAAAAC/gun-bullets.gif';
-const SELF_GIF = 'https://media.tenor.com/C-6mfrI6L9EAAAAC/anime-gun.gif';
-const ENEMY_GIF = 'https://media.tenor.com/KQUPSfCb_2kAAAAC/suzaku-kururugi.gif';
+// Local GIF paths
+const ASSETS_DIR = path.join(__dirname, '../assets/roulette');
+const BANG_GIF = path.join(ASSETS_DIR, 'bang.gif');
+const CLICK_GIF = path.join(ASSETS_DIR, 'click.gif');
+const CHALLENGE_GIF = path.join(ASSETS_DIR, 'challenge.gif');
+const TURN_GIF = path.join(ASSETS_DIR, 'turn.gif');
+const START_GIF = path.join(ASSETS_DIR, 'start.gif');
+const SELF_GIF = path.join(ASSETS_DIR, 'self.gif');
+const ENEMY_GIF = path.join(ASSETS_DIR, 'enemy.gif');
 
 // In-memory active games (channelId → game state)
 const activeGames = new Map();
 
 // ─── Helper: Build the challenge embed ───
 function buildChallengeEmbed(challenger, opponent, wager) {
-  return new EmbedBuilder()
+  const file = new AttachmentBuilder(CHALLENGE_GIF, { name: 'challenge.gif' });
+  const embed = new EmbedBuilder()
     .setColor(embeds.COLORS.roulette)
     .setTitle('🔫 Russian Roulette — Face Off!')
     .setDescription(
@@ -33,9 +36,11 @@ function buildChallengeEmbed(challenger, opponent, wager) {
       `⏳ ${opponent.username}, you have **60 seconds** to respond!`
     )
     .setThumbnail(challenger.displayAvatarURL({ dynamic: true }))
-    .setImage(CHALLENGE_GIF)
+    .setImage('attachment://challenge.gif')
     .setFooter({ text: '🍡 Mochi Bot — Russian Roulette' })
     .setTimestamp();
+
+  return { embed, file };
 }
 
 // ─── Helper: Build the turn embed ───
@@ -44,7 +49,8 @@ function buildTurnEmbed(activePlayer, otherPlayer, chamberPosition, totalChamber
   const filled = Math.min(Math.floor(probability / 5), 20);
   const tensionBar = '█'.repeat(filled) + '░'.repeat(20 - filled);
 
-  return new EmbedBuilder()
+  const file = new AttachmentBuilder(TURN_GIF, { name: 'turn.gif' });
+  const embed = new EmbedBuilder()
     .setColor(chamberPosition >= 3 ? 0xFF0000 : embeds.COLORS.roulette)
     .setTitle(`🔫 ${activePlayer.username}'s Turn`)
     .setDescription(
@@ -58,9 +64,11 @@ function buildTurnEmbed(activePlayer, otherPlayer, chamberPosition, totalChamber
       `⏳ *30 seconds before auto-forfeit*`
     )
     .setThumbnail(activePlayer.displayAvatarURL({ dynamic: true }))
-    .setImage(TURN_GIF)
+    .setImage('attachment://turn.gif')
     .setFooter({ text: `💰 ${(wager * 2).toLocaleString()} coins on the line` })
     .setTimestamp();
+    
+  return { embed, file };
 }
 
 // ─── Helper: Build the CLICK (survived) embed ───
@@ -69,7 +77,11 @@ function buildClickEmbed(player, target, chamberPosition, totalChambers) {
   const targetName = isSelf ? 'themselves' : `**${target.username}**`;
   const reaction = isSelf ? 'sweats nervously as the chamber clicks empty... The gun is passed over.' : 'clicks empty! The gun is passed over...';
 
-  return new EmbedBuilder()
+  const gifPath = isSelf ? SELF_GIF : ENEMY_GIF;
+  const gifName = isSelf ? 'self.gif' : 'enemy.gif';
+  const file = new AttachmentBuilder(gifPath, { name: gifName });
+
+  const embed = new EmbedBuilder()
     .setColor(0x2ECC71)
     .setTitle('*click...* 💨')
     .setDescription(
@@ -77,9 +89,11 @@ function buildClickEmbed(player, target, chamberPosition, totalChambers) {
       `✅ **BLANK!** Chamber ${chamberPosition + 1}/${totalChambers} was empty.\n\n` +
       `**${player.username}** ${reaction}`
     )
-    .setImage(isSelf ? SELF_GIF : ENEMY_GIF)
+    .setImage(`attachment://${gifName}`)
     .setFooter({ text: '🍡 Mochi Bot — Russian Roulette' })
     .setTimestamp();
+
+  return { embed, file };
 }
 
 // ─── Helper: Build the BANG (eliminated) embed ───
@@ -87,7 +101,8 @@ function buildBangEmbed(shooter, target, winner, loser, wager) {
   const isSelf = shooter.id === target.id;
   const targetName = isSelf ? 'themselves' : `**${target.username}**`;
 
-  return new EmbedBuilder()
+  const file = new AttachmentBuilder(BANG_GIF, { name: 'bang.gif' });
+  const embed = new EmbedBuilder()
     .setColor(0xFF0000)
     .setTitle('💥 BANG!!! 💀')
     .setDescription(
@@ -97,9 +112,11 @@ function buildBangEmbed(shooter, target, winner, loser, wager) {
       `💰 **${winner.username}** survives and wins **${(wager * 2).toLocaleString()}** Mochi Coins! 🎉\n` +
       `💸 **${loser.username}** lost **${wager.toLocaleString()}** Mochi Coins.`
     )
-    .setImage(BANG_GIF)
+    .setImage('attachment://bang.gif')
     .setFooter({ text: '🍡 Mochi Bot — Russian Roulette' })
     .setTimestamp();
+    
+  return { embed, file };
 }
 
 // ─── Helper: Build the forfeit embed ───
@@ -132,7 +149,7 @@ async function playRoulette(message, challenger, opponent, wager, guildId, gameM
     const otherPlayer = players[(turnIndex + 1) % 2];
 
     // Build turn embed with action buttons
-    const turnEmbed = buildTurnEmbed(activePlayer, otherPlayer, currentChamber, CHAMBERS, wager);
+    const { embed: turnEmbed, file: turnFile } = buildTurnEmbed(activePlayer, otherPlayer, currentChamber, CHAMBERS, wager);
     const pullButtons = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId(`rr_self_${gameId}_${currentChamber}`)
@@ -144,7 +161,7 @@ async function playRoulette(message, challenger, opponent, wager, guildId, gameM
         .setStyle(ButtonStyle.Danger)
     );
 
-    await gameMessage.edit({ embeds: [turnEmbed], components: [pullButtons] });
+    await gameMessage.edit({ embeds: [turnEmbed], components: [pullButtons], files: [turnFile] });
 
     // Wait for the active player to click
     try {
@@ -171,8 +188,8 @@ async function playRoulette(message, challenger, opponent, wager, guildId, gameM
       // Check if this chamber has the bullet
       if (currentChamber === bulletPosition) {
         // BANG! 💥
-        const bangEmbed = buildBangEmbed(activePlayer, target, winner, loser, wager);
-        await gameMessage.edit({ embeds: [bangEmbed], components: [] });
+        const { embed: bangEmbed, file: bangFile } = buildBangEmbed(activePlayer, target, winner, loser, wager);
+        await gameMessage.edit({ embeds: [bangEmbed], components: [], files: [bangFile] });
 
         // Payout to the winner
         await credit(winner.id, guildId, wager * 2, 'roulette_win', `Won Russian Roulette vs ${loser.username} (${(wager * 2).toLocaleString()} coins)`);
@@ -181,8 +198,8 @@ async function playRoulette(message, challenger, opponent, wager, guildId, gameM
         return;
       } else {
         // Click... survived (Blank)
-        const clickEmbed = buildClickEmbed(activePlayer, target, currentChamber, CHAMBERS);
-        await gameMessage.edit({ embeds: [clickEmbed], components: [] });
+        const { embed: clickEmbed, file: clickFile } = buildClickEmbed(activePlayer, target, currentChamber, CHAMBERS);
+        await gameMessage.edit({ embeds: [clickEmbed], components: [], files: [clickFile] });
 
         // Brief dramatic pause
         await new Promise((resolve) => setTimeout(resolve, 3500));
@@ -257,7 +274,7 @@ const rouletteCommands = {
     activeGames.set(channelId, { status: 'pending', challenger: message.author.id, opponent: opponent.id });
 
     // Send challenge
-    const challengeEmbed = buildChallengeEmbed(message.author, opponent, wager);
+    const { embed: challengeEmbed, file: challengeFile } = buildChallengeEmbed(message.author, opponent, wager);
     const challengeButtons = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId(`rr_accept_${channelId}`)
@@ -273,6 +290,7 @@ const rouletteCommands = {
       content: `<@${opponent.id}> — you've been challenged! 🔫`,
       embeds: [challengeEmbed],
       components: [challengeButtons],
+      files: [challengeFile]
     });
 
     // Wait for opponent response
@@ -347,6 +365,7 @@ const rouletteCommands = {
       activeGames.set(channelId, { status: 'playing', challenger: message.author.id, opponent: opponent.id });
 
       // Start the game!
+      const startFile = new AttachmentBuilder(START_GIF, { name: 'start.gif' });
       const startEmbed = new EmbedBuilder()
         .setColor(embeds.COLORS.roulette)
         .setTitle('🔫 The Game Begins...')
@@ -356,11 +375,11 @@ const rouletteCommands = {
           `*Someone isn't making it out alive.* 💀\n\n` +
           `**Prize Pool: ${(wager * 2).toLocaleString()} Mochi Coins**`
         )
-        .setImage(START_GIF)
+        .setImage('attachment://start.gif')
         .setFooter({ text: '🍡 Mochi Bot — Russian Roulette' })
         .setTimestamp();
 
-      await challengeMsg.edit({ embeds: [startEmbed], components: [], content: null });
+      await challengeMsg.edit({ embeds: [startEmbed], components: [], files: [startFile], content: null });
 
       // Brief dramatic pause before first turn
       await new Promise((resolve) => setTimeout(resolve, 2000));
