@@ -11,9 +11,9 @@ const CHAMBERS = 6;
 // Gunshot GIF URLs
 const BANG_GIF = 'https://media1.tenor.com/m/M0s5-KxIMEoAAAAd/gunshot.gif';
 const CLICK_GIF = 'https://media1.tenor.com/m/e_chqW5eReEAAAAd/revolver-spin.gif';
-const CHALLENGE_GIF = 'https://media.tenor.com/cRz9UPHxuegAAAAC/gun-bullets.gif';
+const CHALLENGE_GIF = 'https://media.tenor.com/fklGVnlUSFQAAAAC/russian-roulette.gif';
 const TURN_GIF = 'https://media.tenor.com/lyovtFp0FksAAAAC/shane-gun-spinning.gif';
-const START_GIF = 'https://media.tenor.com/fklGVnlUSFQAAAAC/russian-roulette.gif';
+const START_GIF = 'https://media.tenor.com/cRz9UPHxuegAAAAC/gun-bullets.gif';
 const SELF_GIF = 'https://media.tenor.com/C-6mfrI6L9EAAAAC/anime-gun.gif';
 const ENEMY_GIF = 'https://media.tenor.com/KQUPSfCb_2kAAAAC/suzaku-kururugi.gif';
 
