@@ -297,6 +297,8 @@ async function sendHelp(message) {
       .setDescription(`
 • \`shop         \` — Browse items
 
+• \`desc         \` — View item description (\`desc <item name>\`)
+
 • \`shopbuy      \` — Buy an item (\`shopbuy <item name>\`)
 
 • \`collection   \` — View your items (\`collection\` / \`flex\`)
@@ -332,6 +334,8 @@ async function sendHelp(message) {
       .setTitle('🔒 Admin Commands')
       .setDescription(`
 • \`give        \` — Grant coins (\`give @user <amount>\`)
+
+• \`snatch      \` — Snatch coins (\`snatch @user <amount|all>\`)
 
 • \`setbudget   \` — Set tournament budget (\`setbudget @user <amount>\`)
 

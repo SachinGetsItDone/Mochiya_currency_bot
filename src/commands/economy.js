@@ -137,6 +137,62 @@ const economyCommands = {
     await message.reply({ embeds: [embed] });
   },
 
+  // ─── snatch (admin) ───
+  async snatch(message, args, guildId) {
+    if (!isAdmin(message.member)) {
+      await message.reply({ embeds: [embeds.error('Admin Only', 'You need **Administrator** permission to use this command.')] });
+      return;
+    }
+
+    const target = message.mentions.users.first();
+    if (!target) {
+      await message.reply({ embeds: [embeds.error('Invalid Usage', 'Usage: `mochi snatch @user <amount|all>`')] });
+      return;
+    }
+
+    if (target.bot) {
+      await message.reply({ embeds: [embeds.error('Invalid Target', 'You cannot snatch coins from a bot!')] });
+      return;
+    }
+
+    try {
+      const targetBalance = await getBalance(target.id, guildId);
+      if (targetBalance === 0) {
+        await message.reply({ embeds: [embeds.error('No Coins', `<@${target.id}> has **0** Mochi Coins. There is nothing to snatch!`)] });
+        return;
+      }
+
+      let amount;
+      if (args[1]?.toLowerCase() === 'all') {
+        amount = targetBalance;
+      } else {
+        amount = parseInt(args[1]);
+      }
+
+      if (isNaN(amount) || amount <= 0) {
+        await message.reply({ embeds: [embeds.error('Invalid Amount', 'Please provide a valid positive number or `all`.')] });
+        return;
+      }
+
+      if (targetBalance < amount) {
+        await message.reply({ embeds: [embeds.error('Insufficient Coins', `<@${target.id}> only has **${targetBalance.toLocaleString()}** Mochi Coins. You cannot snatch **${amount.toLocaleString()}**.`)] });
+        return;
+      }
+
+      const newBalance = await debit(target.id, guildId, amount, 'admin_snatch', `Snatched by admin ${message.author.tag}`);
+
+      const embed = embeds.success(
+        'Coins Snatched 💸',
+        `Snatched **${amount.toLocaleString()}** Mochi Coins from <@${target.id}>.\nTheir new balance: **${newBalance.toLocaleString()}** 🪙`,
+        target
+      );
+      await message.reply({ embeds: [embed] });
+    } catch (error) {
+      console.error('Snatch error:', error);
+      await message.reply({ embeds: [embeds.error('Snatch Failed', 'An error occurred while snatching the coins.')] });
+    }
+  },
+
   // ─── top ───
   async top(message, args, guildId) {
     let page = parseInt(args[0]) || 1;

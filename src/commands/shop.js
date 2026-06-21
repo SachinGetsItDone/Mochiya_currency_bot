@@ -814,6 +814,50 @@ const shopCommands = {
     );
     await message.reply({ embeds: [embed] });
   },
+
+  // ─── desc ───
+  async desc(message, args, guildId) {
+    if (args.length < 1) {
+      await message.reply({ embeds: [embeds.error('Invalid Usage', 'Usage: `mochi desc <item name>`')] });
+      return;
+    }
+
+    const itemName = args.join(' ');
+    
+    // Find the item
+    const { data: item, error } = await supabase
+      .from('shop_items')
+      .select('*')
+      .eq('guild_id', guildId)
+      .ilike('name', itemName)
+      .eq('is_active', true)
+      .limit(1)
+      .maybeSingle();
+
+    if (error || !item) {
+      await message.reply({ embeds: [embeds.error('Not Found', `Item "${itemName}" was not found in the shop.`)] });
+      return;
+    }
+
+    const daysLeft = Math.ceil((new Date(item.expiry_date) - new Date()) / (1000 * 60 * 60 * 24));
+    const typeIcon = item.type === 'role' ? '👑 Role' : '🎁 Collectible';
+    const rarityIcon = { 'common': '⚪', 'rare': '🔵', 'epic': '🟣', 'legendary': '🟠' }[item.rarity?.toLowerCase()] || '⚪';
+
+    const embed = embeds.shop(
+      `${rarityIcon} ${item.name}`,
+      `**Description:**\n${item.description || '*No description provided.*'}\n\n` +
+      `💰 **Price:** **${item.price.toLocaleString()}** coins\n` +
+      `📦 **Stock:** **${item.stock_remaining}** / **${item.stock}**\n` +
+      `🏷️ **Rarity:** **${item.rarity}**\n` +
+      `📁 **Type:** **${typeIcon}**\n` +
+      `📅 **Time Left:** **${daysLeft > 0 ? `${daysLeft} days` : 'Expired'}**`,
+      message.author
+    );
+
+    embed.setColor(embeds.getRarityColor(item.rarity));
+
+    await message.reply({ embeds: [embed] });
+  },
 };
 
 module.exports = shopCommands;
